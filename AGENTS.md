@@ -95,8 +95,6 @@ and put the decision into the specification.
 - When the task format changes, update together: the `Task` interface, the templates in `templates/`, `docs/spec.md` and the readme.
   The `version` field versions the format (`jsonType` only marks the file as a task) - bump `version`
   on incompatible changes.
-- Committing is at your discretion (logically complete changes, meaningful messages).
-  Push only when the user asks.
 
 ## Test data
 
