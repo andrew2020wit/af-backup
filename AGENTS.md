@@ -58,14 +58,16 @@ scripts/
   crash-torture.ts  # kill af-backup at random moments and check the invariants (needs npm run build)
 src/
   main.ts       # entry point (bin: dist/main.js)
-  cli.ts        # arguments → run
-  run-pipeline.ts  # the backup run: steps 0-8 (the only command)
+  cli.ts        # arguments → a backup or a size computation
+  run-pipeline.ts  # the backup run: steps 0-8
+  compute-size.ts  # --compute-size: steps 1-4 of a backup, sizes to the console, nothing is written
   services/     # task, destination, file list, copying, compression, verification, log, file system, tar.gz...
   utilities/    # general helpers: error model, arguments, platform, formatting, escaping for the log, strict JSON, destination folder layout, version
   interfaces/   # TypeScript interfaces (*.interface.ts files)
   test-support/ # helpers for tests
 templates/      # what the user copies into a destination folder: windows/, linux/ and macos/, each with
-                #   af-backup-task.json and a launcher script (run-af-backup.cmd / .sh / .command)
+                #   af-backup-task.json and launcher scripts (run-af-backup.cmd / .sh / .command,
+                #   run-af-backup-compute-size.* for --compute-size)
 .gitattributes  # line endings of the launcher scripts: CRLF for .cmd, LF for .sh and .command
 readme.md       # short user-facing description; ends with "License and disclaimer"
 LICENSE         # MIT License

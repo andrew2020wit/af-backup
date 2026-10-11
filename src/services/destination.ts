@@ -8,9 +8,10 @@ import { pathExists } from './safe-file-system.js';
 
 /**
  * Level 1 error unless the destination folder exists and holds neither the backup data folder nor the log
- * of this run. Backups with other start times do not matter.
+ * of this run. Backups with other start times do not matter. Without `names` (--compute-size, nothing is created)
+ * only the folder itself is checked.
  */
-export async function checkDestination(destinationFolder: string, names: BackupNames): Promise<void> {
+export async function checkDestination(destinationFolder: string, names?: BackupNames): Promise<void> {
   let stats;
 
   try {
@@ -25,6 +26,10 @@ export async function checkDestination(destinationFolder: string, names: BackupN
 
   if (!stats.isDirectory()) {
     throw new StartError(`the destination is not a folder: ${destinationFolder}`);
+  }
+
+  if (!names) {
+    return;
   }
 
   const existing: string[] = [];

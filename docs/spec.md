@@ -46,21 +46,25 @@ Cross-platform: Windows, Linux, macOS.
 Console tool `af-backup`. The only way to run it:
 
 ```
-af-backup [<destination folder>]
+af-backup [--compute-size] [<destination folder>]
 ```
 
-- at most one argument - the destination folder (copying and verification, see "Task execution");
+- at most one destination folder argument (copying and verification, see "Task execution");
   a relative path is resolved from the current folder;
-- without an argument the destination folder is the current folder (`cd E:\backups\work` and `af-backup`);
-- with more than one argument, with an empty argument or with an argument starting with `-` - error, code 2
-  (there are no options: no `--help`, `--version`, dry run or interactive mode; the tool asks no questions);
+- without it the destination folder is the current folder (`cd E:\backups\work` and `af-backup`);
+- `--compute-size` - compute the size of the backup instead of making it (see "Computing the size");
+  it may stand before or after the destination folder;
+- with more than one destination folder, with an empty argument, with `--compute-size` given twice or with any other
+  argument starting with `-` - error, code 2 (there are no other options: no `--help`, `--version` or interactive mode;
+  the tool asks no questions);
 - the destination folder must exist and contain the task file `af-backup-task.json`
   (see "Destination folder"); a task file is created by copying a template from the repository (see "Task template").
 
 **One task per run.** Several tasks - several commands. This way the exit code is always unambiguous.
 
 Verification is always part of a run (see "Verification"); there is no separate command for it.
-Exclusion masks are checked by the log of a run (the number of matches of each mask, see "Exclusions").
+Exclusion masks are checked by the log of a run or by `--compute-size` (the number of matches of each mask,
+see "Exclusions").
 
 The tool keeps nothing in the user's home folder or next to the program: no tasks folder, no shared log.
 
@@ -70,7 +74,7 @@ All service information about a backup is kept **only in its log** **`<destinati
 next to the copied data (see "Destination folder"). Each backup has its own log; it is a plain text file:
 
 ```
-2026-10-04 11:20:15.123 INFO  Backup started: destination folder E:\backups\work; machine DESKTOP-ANDREW, af-backup 1.0.0, Node 22.x, Windows 10.0.26300, time zone +03:00
+2026-10-04 11:20:15.123 INFO  Backup started: destination folder E:\backups\work; machine DESKTOP-ANDREW, af-backup 1.2.0, Node 22.x, Windows 10.0.26300, time zone +03:00
 2026-10-04 11:20:16.002 WARN  Skipped link: work-docs/link -> D:\other
 2026-10-04 11:20:16.410 INFO  Backup data folder created: E:\backups\work\backup-data-2026-10-04-11-20-15
 2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: the file is locked (EBUSY), 3 attempts
@@ -133,6 +137,49 @@ If output is not a terminal (for example, redirected to a file) - no progress an
 | 1 | the backup finished with errors - it is not a valid backup |
 | 2 | could not start (level 1 error, invalid arguments) |
 | 3 | execution interrupted (Ctrl+C, termination signal) |
+
+With `--compute-size` the codes mean the same for the computation (see "Computing the size").
+
+### Computing the size
+
+`af-backup --compute-size [<destination folder>]` shows how much the backup would copy, without making it.
+**Nothing is written:** no log file, no backup data folder; everything goes to the console only, in the format
+of the log lines (`ERROR` and `WARN` to stderr, `INFO` to stdout). It is meant for checking a task before
+a backup: the size of each source, the effect of the exclusion masks, the free space, and the items that cannot be read.
+
+The checks and the file list are the same as before a backup (steps 1-4 of "Task execution"), except that a backup
+with the same start time is not looked for (nothing is created):
+
+1. The "Size computation started" line - the destination folder, machine, program, Node.js, OS and time zone.
+2. The destination folder exists and is a folder; the task file is read and validated; overlapping paths.
+   A failure is a level 1 error: "Size computation could not start, code 2: ...".
+3. The file list is built by the same rules (exclusions first, links and special files skipped with a warning,
+   the "same disk" warning); errors and warnings are printed as they are found, the same as in a backup:
+   an item that cannot be read, a source that does not exist or is empty.
+4. One line per source: files, folders (inside the source), the total size of the files, how many items
+   were excluded; a compressed source is shown with its uncompressed size ("the archive will be smaller");
+   a source that cannot be used - "not available (see the error above)".
+5. The total line: files, folders and size of all sources, the exclusion mask summary (as in the backup summary),
+   and the free space: the required space computed as in "Safeguards → Free space" (rounded up to blocks, with
+   the margin) and the space available in the destination folder. If there is not enough space, this is an error
+   (the backup would not start); if the free space cannot be determined - a warning.
+6. The final line: "Size computation finished successfully, code 0", "Size computation finished WITH ERRORS
+   (errors N), code 1" or "Size computation INTERRUPTED, code 3".
+
+```
+2026-10-04 11:20:15.123 INFO  Size computation started: destination folder E:\backups\work; machine DESKTOP-ANDREW, af-backup 1.2.0, Node 22.x, Windows 10.0.26300, time zone +03:00
+2026-10-04 11:20:16.002 WARN  Skipped link: work-docs/link -> D:\other
+2026-10-04 11:20:16.010 ERROR work-docs/locked: cannot read the folder, its content is skipped: operation not permitted (EPERM)
+2026-10-04 11:20:16.300 INFO  Source "work-docs" (C:\work\docs): 1520 files / 86 folders / 700 MB; excluded 22
+2026-10-04 11:20:16.300 INFO  Source ".gitconfig" (C:\Users\me\.gitconfig): 1 file / 0 folders / 1.2 KB; excluded 0
+2026-10-04 11:20:16.300 INFO  Source "notes" (C:\work\notes): 40 files / 3 folders / 12 MB; excluded 290 (compressed: the archive will be smaller)
+2026-10-04 11:20:16.301 INFO  Total: 1561 files / 89 folders / 712 MB; excluded 312 (node_modules: 5, Thumbs.db: 12, *.tmp: 290, work-docs/drafts: 5); required about 812 MB with a margin, available 120 GB
+2026-10-04 11:20:16.301 ERROR Size computation finished WITH ERRORS (errors 1), code 1
+```
+
+The exit codes are those of a backup: 0 - no errors; 1 - there were errors (items that cannot be read, a missing
+or empty source, not enough space: the backup would finish with errors or would not start); 2 - could not start
+(level 1 error, invalid arguments); 3 - interrupted.
 
 ## Task
 
@@ -199,8 +246,9 @@ it lies in (without an argument, from that folder) in its own terminal window, p
 for a key before the window closes, so that the result stays readable. On Linux, started without a terminal
 (from a file manager), the script opens one (`x-terminal-emulator`, `gnome-terminal`, `konsole`, `xfce4-terminal`,
 `xterm`). If `af-backup` is not found in `PATH`, the script says so and waits for a key too. The scripts on Linux
-and macOS must be executable (`chmod +x`). The scripts are not part of the tool: in the destination folder they are
-files like any other, and the tool ignores them.
+and macOS must be executable (`chmod +x`). Next to each of them lies the same script for `--compute-size`:
+`run-af-backup-compute-size.cmd`, `.sh` and `.command` (see "Computing the size"). The scripts are not part of
+the tool: in the destination folder they are files like any other, and the tool ignores them.
 
 ### Validation
 

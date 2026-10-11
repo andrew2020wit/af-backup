@@ -1,6 +1,6 @@
 // Steps 1-4 of "Task execution" (docs/spec.md): checks before anything is created in the destination folder -
 // the destination folder, the task, overlapping paths, the file list, same disk, free space ("Safeguards").
-// Nothing is changed on disk here.
+// Also the whole of --compute-size ("Computing the size"). Nothing is changed on disk here.
 
 import * as path from 'node:path';
 import { StartError, describeError } from '../utilities/errors.js';
@@ -20,15 +20,26 @@ const MINIMUM_MARGIN = 100 * 1024 * 1024;
 export interface PrepareOptions {
   /** Absolute path of the destination folder. */
   destinationFolder: string;
-  /** The backup data folder and the log of this run (named by its start time). */
-  backupNames: BackupNames;
+  /**
+   * The backup data folder and the log of this run (named by its start time): the destination folder must not hold them.
+   * Absent for --compute-size: nothing is created, so there is nothing to collide with.
+   */
+  backupNames?: BackupNames;
   report: RunReport;
   signal: AbortSignal;
+}
+
+/** Space in the destination folder: required for the backup (rounded up to blocks, with the margin) and available. */
+export interface SpaceEstimate {
+  required: number;
+  available: number;
 }
 
 export interface Prepared {
   task: ValidatedTask;
   list: FileList;
+  /** null if the free space cannot be determined (a warning has been reported). */
+  space: SpaceEstimate | null;
 }
 
 export async function prepareRun(options: PrepareOptions): Promise<Prepared> {
@@ -39,28 +50,28 @@ export async function prepareRun(options: PrepareOptions): Promise<Prepared> {
   const task = await loadTask(destinationFolder);
   // Step 3: overlapping paths
   await checkOverlaps(task, destinationFolder);
-  // Step 4: file list, same disk, free space
+  // Step 4: file list, same disk, free space (compared by the caller: see notEnoughSpace)
   const list = await buildFileList(task, report, signal);
   await checkSameDisk(destinationFolder, list.sources, report);
-  let space;
+  let space: SpaceEstimate | null = null;
 
   try {
-    space = await destinationSpace(destinationFolder);
+    const destination = await destinationSpace(destinationFolder);
+    space = { required: requiredSpace(list, destination.blockSize), available: destination.available };
   } catch (error) {
     report.warn(`cannot determine free space in the destination folder: ${describeError(error)} - the space check is skipped`);
   }
 
-  if (space) {
-    const required = requiredSpace(list, space.blockSize);
+  return { task, list, space };
+}
 
-    if (required > space.available) {
-      throw new StartError(
-        `not enough space in the destination folder ${destinationFolder}: required about ${formatBytes(required)} (with a margin), available ${formatBytes(space.available)}`,
-      );
-    }
+/** The "not enough space" text, or null if there is enough space or it is unknown. */
+export function notEnoughSpace(destinationFolder: string, space: SpaceEstimate | null): string | null {
+  if (!space || space.required <= space.available) {
+    return null;
   }
 
-  return { task, list };
+  return `not enough space in the destination folder ${destinationFolder}: required about ${formatBytes(space.required)} (with a margin), available ${formatBytes(space.available)}`;
 }
 
 async function resolveLinks(targetPath: string): Promise<string> {

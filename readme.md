@@ -71,7 +71,9 @@ After updating the repository (`git pull`), run `npm run build` again.
    To start it by a double click, copy the launcher script from the same templates folder next to the task:
    `run-af-backup.cmd` (Windows), `run-af-backup.sh` (Linux) or `run-af-backup.command` (macOS; on Linux
    and macOS make it executable: `chmod +x`). It runs af-backup for its folder in a terminal window and waits
-   for a key before closing the window.
+   for a key before closing the window. `run-af-backup-compute-size.*` does the same for `--compute-size`.
+
+   Before the first backup you can check the task with `af-backup --compute-size E:\backups\work` (see "Running").
 
 The result is the folder `E:\backups\work\backup-data-2026-10-04-11-20-15` with a subfolder per source
 (for a compressed source - the archive `<name>.tar.gz`, here `notes.tar.gz`) and nothing else,
@@ -84,14 +86,26 @@ when they are no longer needed or when space runs short: af-backup never deletes
 ## Running
 
 ```
-af-backup [<destination folder>]
+af-backup [--compute-size] [<destination folder>]
 ```
 
 This is the only way to run af-backup: there are no other commands or options.
-Without an argument the destination folder is the current folder.
+Without a folder the destination folder is the current folder.
 The destination folder must exist and contain the task file `af-backup-task.json`;
 it must not already hold a backup with the same start time (two runs within the same second).
 af-backup keeps nothing in your home folder.
+
+**`--compute-size`** (before or after the folder) does not make a backup and writes nothing, not even a log:
+it shows in the console how much each source would copy (files, folders, size, excluded items), the total,
+how many items each exclusion mask matched, and the free space against the space required. Items that cannot be read,
+missing or empty sources and not enough space are printed as errors, and the exit code is 1 then:
+
+```
+INFO  Source "work-docs" (C:\work\docs): 1520 files / 86 folders / 700 MB; excluded 22
+INFO  Source "notes" (C:\work\notes): 40 files / 3 folders / 12 MB; excluded 290 (compressed: the archive will be smaller)
+INFO  Total: 1561 files / 89 folders / 712 MB; excluded 312 (...); required about 812 MB with a margin, available 120 GB
+INFO  Size computation finished successfully, code 0
+```
 
 ## Task fields
 
@@ -150,7 +164,7 @@ Ctrl+C stops the backup gracefully; a second Ctrl+C exits immediately. The resul
 |---|---|
 | 0 | the backup finished successfully |
 | 1 | the backup finished with errors (including verification mismatches) - it is not a valid backup |
-| 2 | could not start (an option or extra arguments, error in the task, disk not connected, etc.) |
+| 2 | could not start (an unknown option or extra arguments, error in the task, disk not connected, etc.) |
 | 3 | interrupted |
 
 Verification is always part of the backup; there is no separate command to re-check a backup later.

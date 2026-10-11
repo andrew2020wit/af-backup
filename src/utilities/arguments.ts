@@ -1,33 +1,41 @@
-// Command line: `af-backup [<destination folder>]` - at most one argument, no options; without an argument
-// the destination folder is the current folder (docs/spec.md, "Running").
+// Command line: `af-backup [--compute-size] [<destination folder>]` - at most one destination folder and the only option
+// `--compute-size`, in any order; without a folder the destination folder is the current folder (docs/spec.md, "Running").
+
+export const COMPUTE_SIZE_OPTION = '--compute-size';
 
 const USAGE =
-  'usage: af-backup [<destination folder>] (an existing folder with the task file af-backup-task.json; the current folder if omitted)';
+  'usage: af-backup [--compute-size] [<destination folder>] (an existing folder with the task file af-backup-task.json; the current folder if omitted)';
 
-/** Returns an error text, or null if the arguments are at most one destination folder. */
-export function checkArguments(argv: readonly string[]): string | null {
-  if (argv.length > 1) {
-    return `at most one argument is expected, got ${argv.length} - ${USAGE}`;
+export type ParsedCommandLine = { ok: true; destinationFolder: string; computeSize: boolean } | { ok: false; problem: string };
+
+export function parseCommandLine(argv: readonly string[]): ParsedCommandLine {
+  let destinationFolder: string | undefined;
+  let computeSize = false;
+
+  for (const argument of argv) {
+    if (argument === '') {
+      return { ok: false, problem: `an empty argument - ${USAGE}` };
+    }
+
+    if (argument === COMPUTE_SIZE_OPTION) {
+      if (computeSize) {
+        return { ok: false, problem: `${COMPUTE_SIZE_OPTION} is given twice - ${USAGE}` };
+      }
+
+      computeSize = true;
+      continue;
+    }
+
+    if (argument.startsWith('-')) {
+      return { ok: false, problem: `unknown option: ${argument} (the only option is ${COMPUTE_SIZE_OPTION}) - ${USAGE}` };
+    }
+
+    if (destinationFolder !== undefined) {
+      return { ok: false, problem: `at most one destination folder is expected, got ${destinationFolder} and ${argument} - ${USAGE}` };
+    }
+
+    destinationFolder = argument;
   }
 
-  const destinationFolder = argv[0];
-
-  if (destinationFolder === undefined) {
-    return null;
-  }
-
-  if (destinationFolder === '') {
-    return `the destination folder is empty - ${USAGE}`;
-  }
-
-  if (destinationFolder.startsWith('-')) {
-    return `there are no options: ${destinationFolder} - ${USAGE}`;
-  }
-
-  return null;
-}
-
-/** The destination folder argument: the given one, or the current folder without an argument. */
-export function destinationArgument(argv: readonly string[]): string {
-  return argv[0] ?? '.';
+  return { ok: true, destinationFolder: destinationFolder ?? '.', computeSize };
 }

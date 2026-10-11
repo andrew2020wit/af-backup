@@ -17,6 +17,7 @@ flowchart TD
   cli["cli.ts<br/>arguments → run"]
   arguments["utilities/arguments.ts<br/>at most one argument"]
   pipeline["run-pipeline.ts<br/>steps 0-8, summary, final line"]
+  computeSize["compute-size.ts<br/>--compute-size: steps 1-4, sizes, nothing written"]
   prepare["services/prepare.ts<br/>steps 1-4"]
   fileList["services/file-list.ts<br/>file list, exclusions"]
   copier["services/copier.ts<br/>uncompressed source, retries"]
@@ -32,6 +33,9 @@ flowchart TD
   main --> cli
   cli --> arguments
   cli --> pipeline
+  cli --> computeSize
+  computeSize --> prepare
+  computeSize --> report
   pipeline --> log
   pipeline --> prepare
   pipeline --> destination
@@ -95,6 +99,26 @@ flowchart TD
 Ctrl+C at any point: before the log file exists - "could not start: interrupted, code 3";
 after - copying or verification stops, the summary and "Backup INTERRUPTED, code 3" are written.
 A second Ctrl+C exits at once (no final line - the backup is not valid).
+
+## Computing the size (`--compute-size`)
+
+`compute-size.ts` runs the same `prepareRun` as steps 1-4 of a backup, without the "backup with this start time"
+check, and prints the lines to the console only (no log file, no backup data folder):
+
+```mermaid
+flowchart TD
+  start(["af-backup --compute-size FOLDER"]) --> started["'Size computation started'"]
+  started --> checks["destination folder exists, task, overlapping paths"]
+  checks -- "level 1 error" --> cannotStart(["could not start, code 2"])
+  checks --> list["file list (exclusions first): errors and warnings as found;<br/>free space estimate"]
+  list --> lines["a line per source, the total line<br/>(masks, required / available space)"]
+  lines --> status{"errors?<br/>(items, sources, not enough space)"}
+  status -- none --> ok(["finished successfully, code 0"])
+  status -- some --> withErrors(["finished WITH ERRORS, code 1"])
+```
+
+`prepareRun` only estimates the free space; the caller decides: a backup does not start without enough space
+(level 1), `--compute-size` reports it as an error.
 
 ## Copying one file (uncompressed source)
 

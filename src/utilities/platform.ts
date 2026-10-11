@@ -1,4 +1,7 @@
+import * as os from 'node:os';
 import * as path from 'node:path';
+import { formatTimezoneOffset } from './format.js';
+import { programVersion } from './version.js';
 
 export type PlatformKind = 'win32' | 'posix';
 
@@ -41,4 +44,12 @@ export function osDescription(): string {
     default:
       return process.platform;
   }
+}
+
+/** For the first line of a run: "machine X, af-backup 1.1.0, Node 22.x, Windows 10.0.26300, time zone +03:00". */
+export function environmentDescription(startTime: Date): string {
+  return (
+    `machine ${os.hostname()}, af-backup ${programVersion()}, Node ${process.versions.node}, ` +
+    `${osDescription()} ${os.release()}, time zone ${formatTimezoneOffset(startTime)}`
+  );
 }

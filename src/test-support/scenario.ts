@@ -32,8 +32,8 @@ export interface Scenario {
   taskFile: string;
   /** Writes the task file: the default task with these fields replaced. */
   writeTask(fields?: Record<string, unknown>): Promise<void>;
-  /** `af-backup <destination folder>`, in-process. */
-  run(signal?: AbortSignal): Promise<CliRun>;
+  /** `af-backup [extra arguments] <destination folder>`, in-process. */
+  run(signal?: AbortSignal, extraArguments?: string[]): Promise<CliRun>;
   /** Whether the backup with `startTime` (its backup data folder or its log) exists in the destination folder. */
   exists(): Promise<boolean>;
   /** Deletes the backup with `startTime` (the backup data folder and the log), so that the next run can start. */
@@ -69,11 +69,11 @@ export async function createScenario(
 
   await writeTask();
 
-  const run = async (signal = new AbortController().signal): Promise<CliRun> => {
+  const run = async (signal = new AbortController().signal, extraArguments: string[] = []): Promise<CliRun> => {
     const stdout = new MemoryStream();
     const stderr = new MemoryStream();
     const consoleOutput = new ConsoleOutput(stdout, stderr);
-    const code = await runCli([destinationFolder], { consoleOutput, signal, now: () => scenario.startTime });
+    const code = await runCli([...extraArguments, destinationFolder], { consoleOutput, signal, now: () => scenario.startTime });
 
     return { code, stdout: stdout.text, stderr: stderr.text };
   };

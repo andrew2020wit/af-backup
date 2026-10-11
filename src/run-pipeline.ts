@@ -2,7 +2,6 @@
 // only in its log `backup-<start time>.log`: the backup data folder `backup-data-<start time>` is created at the start
 // and never renamed.
 
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { backupNames, type BackupNames } from './utilities/destination-layout.js';
 import type { CliContext } from './interfaces/cli-context.interface.js';
@@ -21,16 +20,15 @@ import {
 } from './utilities/errors.js';
 import { fileSystemOperations } from './services/file-system-operations.js';
 import { fsyncDirectory } from './services/safe-file-system.js';
-import { formatBytes, formatDuration, formatTimezoneOffset, plural } from './utilities/format.js';
+import { formatBytes, formatDuration, plural } from './utilities/format.js';
 import { Log } from './services/log.js';
-import { osDescription } from './utilities/platform.js';
-import { programVersion } from './utilities/version.js';
+import { environmentDescription } from './utilities/platform.js';
 import { archiveSource } from './services/archive-source.js';
 import { copySource, type CopyContext, type CopyProgress } from './services/copier.js';
 import { checkDestination } from './services/destination.js';
 import { CopiedItems } from './services/copied-items.js';
 import { maskSummary } from './services/file-list.js';
-import { prepareRun, type Prepared } from './services/prepare.js';
+import { notEnoughSpace, prepareRun, type Prepared } from './services/prepare.js';
 import { RunReport } from './services/run-report.js';
 import { verifyBackupFolder, type VerifyOptions, type VerifyResult } from './services/verifier.js';
 
@@ -41,11 +39,7 @@ export async function runBackup(destinationArgument: string, context: CliContext
   const log = new Log(context.consoleOutput);
 
   // Step 0: the "Backup started" line - kept in memory until the log file is created at step 5
-  log.write(
-    'INFO',
-    `Backup started: destination folder ${destinationFolder}; machine ${os.hostname()}, af-backup ${programVersion()}, ` +
-      `Node ${process.versions.node}, ${osDescription()} ${os.release()}, time zone ${formatTimezoneOffset(startTime)}`,
-  );
+  log.write('INFO', `Backup started: destination folder ${destinationFolder}; ${environmentDescription(startTime)}`);
 
   let code: number;
 
@@ -75,6 +69,12 @@ async function prepareAndRun(destinationFolder: string, names: BackupNames, star
 
   try {
     prepared = await prepareRun({ destinationFolder, backupNames: names, report, signal: context.signal });
+    const spaceProblem = notEnoughSpace(destinationFolder, prepared.space);
+
+    // a backup does not start without enough space (level 1)
+    if (spaceProblem) {
+      throw new StartError(spaceProblem);
+    }
   } catch (error) {
     return cannotStart(error, log);
   }

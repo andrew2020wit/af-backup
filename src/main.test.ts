@@ -14,7 +14,7 @@ before(async () => {
 
 after(() => cleanup());
 
-test('with options, an empty or extra arguments - code 2, a "could not start" line in stderr only', async () => {
+test('with unknown options, an empty or extra arguments - code 2, a "could not start" line in stderr only', async () => {
   const empty = path.join(directory, 'empty');
   await fsPromises.mkdir(empty);
 
@@ -22,8 +22,12 @@ test('with options, an empty or extra arguments - code 2, a "could not start" li
     const result = await runMain(commandLineArguments, { cwd: empty });
     assert.equal(result.code, 2, commandLineArguments.join(' '));
     assert.equal(result.stdout, '');
-    assert.match(result.stderr, / ERROR Backup could not start, code 2: .*usage: af-backup \[<destination folder>\]/);
+    assert.match(result.stderr, / ERROR Backup could not start, code 2: .*usage: af-backup \[--compute-size\] \[<destination folder>\]/);
   }
+
+  const twice = await runMain(['--compute-size', '--compute-size'], { cwd: empty });
+  assert.equal(twice.code, 2);
+  assert.match(twice.stderr, / ERROR Size computation could not start, code 2: --compute-size is given twice/);
 
   assert.deepEqual(await fsPromises.readdir(empty), [], 'nothing is created');
 });
@@ -54,6 +58,15 @@ test('without an argument the destination folder is the current folder', async (
     path.join(destinationFolder, 'af-backup-task.json'),
     JSON.stringify({ jsonType: 'af-backup-task', version: 1, sources: [{ path: source, name: 'docs' }] }),
   );
+
+  // --compute-size before or after the folder (here: the current one) - nothing is written
+  for (const commandLineArguments of [['--compute-size'], ['--compute-size', '.'], ['.', '--compute-size']]) {
+    const computed = await runMain(commandLineArguments, { cwd: destinationFolder });
+    assert.equal(computed.code, 0, computed.stderr);
+    assert.match(computed.stdout, / INFO {2}Source "docs" \(.*src\): 1 file \/ 0 folders \/ 5 bytes; excluded 0\n/);
+    assert.match(computed.stdout, / INFO {2}Size computation finished successfully, code 0\n$/);
+    assert.deepEqual(await fsPromises.readdir(destinationFolder), ['af-backup-task.json']);
+  }
 
   const result = await runMain([], { cwd: destinationFolder });
   assert.equal(result.code, 0, result.stderr);
