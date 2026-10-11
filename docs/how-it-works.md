@@ -3,10 +3,13 @@
 A visual overview of what happens during `af-backup [<destination folder>]`, mapped onto the source code.
 [spec.md](spec.md) is the source of truth for behavior; this file only shows how it fits together.
 
+TIME below is the start time of the run, `yyyy-mm-dd-HH-MM-SS`: a run creates `backup-data-TIME` and `backup-TIME.log`
+(`backup-data-2026-10-04-11-20-15`, `backup-2026-10-04-11-20-15.log`).
+
 ## Modules
 
-Who calls whom. Everything that touches the file system goes through `fileSystemOperations`
-(tests replace its methods to simulate faults).
+Who calls whom. All work with files and folders goes through `fileSystemOperations` (tests replace its methods
+to simulate faults); the only exception is reading the program's own `package.json` for the version (`utilities/version.ts`).
 
 ```mermaid
 flowchart TD
@@ -31,6 +34,7 @@ flowchart TD
   cli --> pipeline
   pipeline --> log
   pipeline --> prepare
+  pipeline --> destination
   prepare --> destination
   prepare --> task
   prepare --> fileList
@@ -43,22 +47,29 @@ flowchart TD
   fileList --> report
   copier --> report
   report --> log
-  copier --> fs
-  archive --> fs
-  verifier --> fs
+  pipeline --> fs
+  prepare --> fs
+  destination --> fs
+  task --> fs
   fileList --> fs
+  copier --> fs
+  tar --> fs
+  verifier --> fs
   log --> fs
 ```
 
-## A run, step by step
+`pipeline → destination`: the destination folder check is repeated at step 5, right before the log file is created.
+`archive-source.ts` does not touch the disk itself: the archive is written by `tar-writer.ts`, the source files are read
+by `readSourceFile` from `copier.ts`.
 
-TIME below is the start time of the run, `yyyy-mm-dd-HH-MM-SS` (`backup-data-2026-10-04-11-20-15`).
+## A run, step by step
 
 Nothing is changed on disk before step 5: a failure at steps 1-4 (or creating the log file at step 5) is
 "could not start", printed to the console only, and nothing is created in the destination folder (except a log file that
-was created but could not be written: it stays). The lines produced
-before step 5 are kept in memory and written to the log file first when it is created. From the creation of the backup data folder on,
-the run always ends with the summary and a final line.
+was created but could not be written: it stays). The lines produced before step 5 are kept in memory and written
+to the log file first when it is created. If the log file has been created but the backup data folder cannot be created,
+the run is "could not start" too, but this line also goes into the log, and the log stays. From the creation
+of the backup data folder on, the run always ends with the summary and a final line.
 
 ```mermaid
 flowchart TD
@@ -99,17 +110,21 @@ flowchart TD
   stat2 --> changed{"size or mtime<br/>changed?"}
   changed -- no --> finish["set mtime, fsync, close"]
   finish --> record(["record path, size, SHA-256<br/>(list of copied items)"])
-  changed -- yes --> failed
-  open & loop -- error --> classify{"error kind"}
+  changed -- yes --> cleanup
+  stat1 & open & loop -- error --> cleanup["delete our unfinished file<br/>(if this attempt created it)"]
+  cleanup --> classify{"error kind"}
   classify -- "destination: disk full, I/O,<br/>disk gone" --> fatal(["level 2: stop the whole run"])
   classify -- "destination: name, size limit,<br/>collision" --> itemError(["level 3: skip the file"])
   classify -- "source: locked, read error" --> available{"source root<br/>still available?"}
+  classify -- "source changed" --> attempts
   available -- no --> stopSource(["level 3: stop this source,<br/>other sources go on"])
-  available -- yes --> failed["delete our unfinished file"]
-  failed --> attempts{"attempt < 3?"}
+  available -- yes --> attempts{"attempt < 3?"}
   attempts -- "yes (not for a file that disappeared<br/>or whose unfinished copy could not be deleted)" --> pause["pause ~1 s<br/>(Ctrl+C cuts it short)"] --> stat1
   attempts -- no --> itemError
 ```
+
+Only a file created by this attempt is deleted: on a name collision the target could not be created ("new only"),
+and the existing file is not touched.
 
 Folders are created as the list is walked (folders come before their content); on Linux and macOS each folder
 is flushed to disk after everything inside it has been created.
@@ -120,16 +135,24 @@ is flushed to disk after everything inside it has been created.
 so a failed entry is rolled back by truncating the file to the last member boundary.
 
 ```mermaid
-flowchart LR
+flowchart TD
   create["create NAME.tar.gz 'wx'"] --> entry["entry: remember the boundary"]
   entry --> member["gzip member: pax + ustar headers,<br/>file data, padding"]
   member -- ok --> next{"more entries?"}
-  member -- "error" --> truncate["truncate to the boundary<br/>(retry like a plain file)"]
-  truncate --> next
+  member -- error --> truncate["truncate to the boundary"]
+  truncate --> kind{"error kind"}
+  kind -- "source: read error, file changed" --> attempts{"attempt < 3?"}
+  attempts -- yes --> member
+  attempts -- no --> skipped["level 3: the file<br/>is not in the archive"] --> next
+  kind -- "source unavailable,<br/>archive over the size limit (EFBIG)" --> stop["level 3: stop archiving<br/>this source"] --> tarEnd
+  kind -- "other archive write error,<br/>truncation failed" --> fatal(["level 2: stop the whole run"])
   next -- yes --> entry
   next -- no --> tarEnd["tar end as the last member,<br/>fsync, close"]
   tarEnd --> recordArchive(["record archive size + SHA-256,<br/>entries with their SHA-256"])
+  tarEnd -- "EFBIG" --> incomplete(["level 3: archive incomplete,<br/>not counted, not verified"])
 ```
+
+Retries follow the same rules as for an uncompressed source (see above).
 
 ## Verification (step 7)
 
@@ -155,5 +178,5 @@ flowchart TD
 | 4 - warning | `RunReport.warn()` | logged only, status not affected |
 | Ctrl+C | `AbortSignal` → `InterruptedError` | "INTERRUPTED" (or "could not start: interrupted"), code 3 |
 
-The status of a backup exists **only in its log `backup-<start time>.log`**: a backup is valid only if its log ends with
+The status of a backup exists **only in its log `backup-TIME.log`**: a backup is valid only if its log ends with
 "Backup finished successfully".

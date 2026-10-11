@@ -113,7 +113,7 @@ to the console: the start of the backup, warnings and errors, the summary, and t
 ```
 2026-10-04 11:20:15.123 INFO  Backup started: destination folder E:\backups\work; ...
 2026-10-04 11:20:16.410 INFO  Backup data folder created: E:\backups\work\backup-data-2026-10-04-11-20-15
-2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: file is locked (EBUSY), 3 attempts
+2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: the file is locked (EBUSY), 3 attempts
 2026-10-04 11:25:40.880 INFO  Summary: copied 1520 files / 87 folders / 700 MB; ...
 2026-10-04 11:25:40.881 ERROR Backup finished WITH ERRORS: E:\backups\work\backup-data-2026-10-04-11-20-15 is not a valid backup (errors 1), code 1
 ```

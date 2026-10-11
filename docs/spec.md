@@ -70,7 +70,7 @@ next to the copied data (see "Destination folder"). Each backup has its own log;
 2026-10-04 11:20:15.123 INFO  Backup started: destination folder E:\backups\work; machine DESKTOP-ANDREW, af-backup 1.0.0, Node 22.x, Windows 11, time zone +03:00
 2026-10-04 11:20:16.002 WARN  Skipped link: work-docs/link -> D:\other
 2026-10-04 11:20:16.410 INFO  Backup data folder created: E:\backups\work\backup-data-2026-10-04-11-20-15
-2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: file is locked (EBUSY), 3 attempts
+2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: the file is locked (EBUSY), 3 attempts
 2026-10-04 11:25:40.880 INFO  Summary: copied 1520 files / 87 folders / 700 MB; excluded 312 (node_modules: 5, .git: 0, Thumbs.db: 12, *.tmp: 290, work-docs/drafts: 5); warnings 1; errors 1; verification: OK; duration 5 min 25 s
 2026-10-04 11:25:40.881 ERROR Backup finished WITH ERRORS: E:\backups\work\backup-data-2026-10-04-11-20-15 is not a valid backup (errors 1), code 1
 ```
@@ -95,7 +95,8 @@ the final "could not start" line with all the errors - go to the console only.
 Format:
 
 - one line per event: local time with milliseconds, the level (`INFO`, `WARN`, `ERROR`), the text;
-- UTF-8; paths are relative to the backup data folder, with `/`, except the destination folder and the backup data folder paths;
+- UTF-8; paths of copied items are relative to the backup data folder, with `/` (`work-docs/mail.pst`); other paths
+  (the destination folder, the backup data folder, the task file, the log, sources) are absolute;
   OS error codes (`EBUSY`, `ENOSPC`) are written next to the text - handy for searching;
 - control characters in names (on Linux a file name may contain a newline) are escaped
   (`\n`, `\t`, `\xNN`), so that an event always takes one line;
@@ -193,8 +194,8 @@ Validation is strict; any error is a level 1 error, the task does not run.
 - **Absolute paths only** (a relative one would depend on the current folder). `~` and environment variables are not expanded.
 - On Windows an absolute path is a drive letter with a separator (`C:\work`) or a network path (`\\server\share\...`).
   The paths `\work` and `/work` (from the root of the current drive) and `C:work` (from the current folder of drive C:) are errors,
-  even though `path.isAbsolute` treats the first two as absolute. The `\\?\` prefix is not accepted
-  (long paths are supported without it).
+  even though `path.isAbsolute` treats the first two as absolute. The `\\?\` and `\\.\` prefixes are not accepted
+  (long paths are supported without them).
 - On Windows both separators are accepted in paths: `C:\\work` and `C:/work`.
 - **`jsonType`** other than `"af-backup-task"` or missing - error "this is not an af-backup task file".
 - **`version`** greater than `1` (an integer) - error "task format is newer than the program - update af-backup";
@@ -728,7 +729,7 @@ For a compressed source:
 This checks the main thing: that the correct files can actually be restored from the archive.
 
 Verification does not stop at the first mismatch: all files are checked, all mismatches are written to the log
-as errors. A mismatch is a sign of a problem with the destination disk, so the summary says so separately
+as errors. A mismatch is a sign of a problem with the destination disk, so the log says so in a separate line before the summary
 (except unfinished files that could not be deleted, see "Retries": they are explained by the warning written while copying).
 
 Known limitations:
