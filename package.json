@@ -1,6 +1,6 @@
 {
   "name": "af-backup",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A simple console tool for personal backups, designed with reliability as the top priority",
   "license": "MIT",
   "private": true,
