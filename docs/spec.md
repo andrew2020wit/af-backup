@@ -4,6 +4,9 @@ A tool for simple personal backups, written in TypeScript for Node.js.
 
 This is the complete behavior specification. A short user-facing description is in the [readme](../readme.md).
 
+The specification describes how the tool is designed to behave; it is not a warranty or a promise of the developer.
+The tool is provided as is, without any warranty (see "License and disclaimer" in the readme).
+
 ## Principles
 
 - **Simplicity.** Limited functionality, no unnecessary features.
@@ -709,7 +712,7 @@ Known limitation: a change within one modification time "tick" is not detected.
 
 Without a forced flush, the OS keeps written data in the cache. If power is lost after the "finished successfully"
 line has reached the disk but before the data has, the log would call a backup with corrupted files valid -
-this would break the main guarantee.
+this would defeat the main goal (see "Goals").
 
 So every copied file (or compressed source archive) is flushed to disk (fsync) **before** the final line
 is written to the log, and the log is flushed after it.
@@ -720,7 +723,7 @@ too - after all its items have been created (including the backup data folder it
 which holds the entries of the backup data folder and the log). On Windows flushing folders is not available; it is not done there.
 
 A flush error of the backup is a level 2 error. The cost is a noticeable slowdown with many small files
-(especially on USB drives); it is justified for the sake of the guarantee.
+(especially on USB drives); it is accepted for the sake of this goal.
 
 If power is lost before the final line reaches the disk, the log has no final line -
 the safe side: the backup is not considered valid.
@@ -816,13 +819,16 @@ for this run - the backup is not considered valid, the safe side.
 
 See "Running → Exit codes".
 
-## Guarantees
+## Goals
+
+What the tool is designed to achieve. These are design goals that the behavior above serves, not guarantees:
+the tool is provided as is, without any warranty (see "License and disclaimer" in the [readme](../readme.md)).
 
 - Nothing is written to a source.
-- A backup whose log ends with the "finished successfully" line contains a complete and verified copy -
+- A backup whose log ends with the "finished successfully" line holds a complete and verified copy -
   everything that must be copied by the task rules (exclusions and links and special files skipped with a warning
-  are visible in the log), and its data had been flushed to disk before that line was written.
-- The tool never deletes, overwrites or writes into anything that existed before the run: if the destination folder
+  are visible in the log), and its data is flushed to disk before that line is written.
+- The tool does not delete, overwrite or write into anything that existed before the run: if the destination folder
   already holds `backup-data-<start time>` or `backup-<start time>.log` with the start time of this run, the backup
   does not start. The only things it deletes are its own unfinished files inside the backup data folder it has just created.
 - Nothing is written in the destination folder outside the backup data folder and the log of this run;

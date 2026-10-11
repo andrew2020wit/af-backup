@@ -1,7 +1,8 @@
 {
   "name": "af-backup",
   "version": "1.0.0",
-  "description": "A simple and reliable console tool for personal backups",
+  "description": "A simple console tool for personal backups, designed with reliability as the top priority",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "bin": {

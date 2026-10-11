@@ -64,7 +64,8 @@ src/
   interfaces/   # TypeScript interfaces (*.interface.ts files)
   test-support/ # helpers for tests
 templates/      # static task templates the user copies: windows/, linux/ and macos/, each af-backup-task.json
-readme.md       # short user-facing description
+readme.md       # short user-facing description; ends with "License and disclaimer"
+LICENSE         # MIT License
 test-data.md    # local test data registry, not in git (see "Test data")
 test-data/      # test data, one subfolder per session, not in git
 ```
@@ -76,9 +77,13 @@ live in the root of `src/`; helpers live in `src/<kind>/`, by kind of file (`ser
 ## Key concepts
 
 Not duplicated here so they do not go stale: task, destination, backup folder statuses, verification
-and guarantees are described in [docs/spec.md](docs/spec.md).
+and design goals are described in [docs/spec.md](docs/spec.md).
 If something is missing or ambiguous in the specification, do not make it up: discuss it with the user first
 and put the decision into the specification.
+
+The documentation must not read as personal obligations of the developer: describe what the tool is designed
+to do ("goals", "designed to"), not guarantees or promises. The tool is provided as is, without any warranty
+(readme, "License and disclaimer").
 
 ## Working rules
 
