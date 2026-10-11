@@ -13,11 +13,8 @@ Instructions for AI agents working with this repository.
 
 ## Current state
 
-Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24, 26. Manual checks still to be done:
-the first CI run (2026-10-11, commit eb688e1, https://github.com/andrew2020wit/af-backup/actions/runs/38114112306)
-failed `npm test` on Node 22 on Ubuntu and macOS (the cause is not known yet: the logs need a GitHub sign-in);
-the other 7 jobs passed, including the compatibility step; whether the CI compatibility step finds 7-Zip on all three OSes
-(it skips tools that are not installed); the archive compatibility check from the spec
+Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24, 26
+(https://github.com/andrew2020wit/af-backup/actions). Manual checks still to be done: the archive compatibility check from the spec
 on an archive written by af-backup - `node scripts/tar-gz-compatibility.ts all <work-dir> --af-backup` with the full set
 (8 GiB file, 70,000 entries; so far only a small set on Windows 11, 2026-10-11), plus File Explorer on Windows 11,
 `tar` on Windows 10, Finder and `tar` on macOS, GNU `tar` on Linux; backup to a FAT32/exFAT flash drive (`EFBIG`, case); pulling out the flash drive during copying;
@@ -25,7 +22,9 @@ a disk root as a source on Linux (`lost+found`) and macOS (`.Spotlight-V100`, `.
 service folders cannot be read (see "Sources" in the spec); Unicode normalization on macOS - names stored
 decomposed (NFD): masks with letters like "й" and verification on an HFS+ destination (false "missing"/"extra").
 Done: long paths over 260 characters on Windows (2026-10-11, Windows 11, Node 26, an uncompressed source,
-a 560-character path).
+a 560-character path); the first CI run (2026-10-11): 7-Zip is found on all three OSes and the compatibility step
+passes; `npm test` failed on Node 22 on Linux and macOS (Node 22 there truncates the modification time to microseconds)
+- fixed in `copier.ts`, to be confirmed by the next CI run.
 
 ## Build and tests
 

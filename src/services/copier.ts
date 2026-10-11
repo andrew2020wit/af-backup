@@ -359,9 +359,11 @@ async function copyOnce(entry: ListedEntry, target: string, backupPath: string, 
       throw new Error('internal error: the target file was not created');
     }
 
-    // seconds as a number, not a Date: a Date would cut the time to milliseconds; whole microseconds are exact
-    // in a double, and the fraction keeps sub-microsecond precision
-    const mtime = Number(readResult.mtimeNs / 1000n) / 1_000_000;
+    // Seconds as a number, not a Date: a Date would cut the time to milliseconds. A double holds today's times
+    // in steps of about 0.24 µs, so whole microseconds are not exact, and Node.js 22 on Linux and macOS truncates
+    // the value to microseconds: 1577934245.678911 is stored as ...678910.97 and would become ...678910.
+    // A quarter of a microsecond on top keeps the microsecond and stays within 0.4 µs of the source time.
+    const mtime = (Number(readResult.mtimeNs / 1000n) + 0.25) / 1_000_000;
 
     try {
       await targetHandle.utimes(mtime, mtime);

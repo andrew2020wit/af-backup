@@ -455,6 +455,11 @@ Results (2026-10-03, Windows 11, archive 8.02 GiB, 70,118 files and 123 folders,
 
 Not checked: File Explorer on Windows 11, `tar` on Windows 10, Finder and `tar` on macOS, GNU `tar` on Linux.
 
+The first CI run (2026-10-11, a small set of the same test data written by af-backup itself, without the big file)
+extracted everything correctly with GNU `tar` and Python `tarfile` on Linux, `tar` (bsdtar) on macOS, 7-Zip 23.01+
+on all three OSes and the built-in `tar` on the Windows runner (bsdtar 3.8.4): there it extracted the entries with emoji
+too, so whether the built-in Windows `tar` skips them depends on the code page settings of the machine.
+
 **Errors and retries.** Before each file is written, the current archive size is remembered - the boundary
 between gzip members. If writing a file failed, the archive is truncated to that boundary (**rollback**):
 only complete entries remain in the archive. So files of a compressed source are handled the same way
@@ -678,7 +683,7 @@ What is copied is **file content and folder structure** - not everything a file 
 | hard links | copied as separate files (content is duplicated) |
 | sparse files | copied expanded (may take more space) |
 | cloud placeholder files (OneDrive, Dropbox "on demand") | downloaded when read; if the download fails - error |
-| file modification time | preserved; if it cannot be set - warning |
+| file modification time | preserved to within a microsecond (Node.js sets it as a floating-point number of seconds); if it cannot be set - warning |
 | creation time | not preserved |
 | Unix permissions, Windows attributes (including "read-only"), ACLs, owner, NTFS alternate data streams, extended attributes | not preserved |
 
