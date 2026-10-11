@@ -1,10 +1,14 @@
-# Build and tests on three OSes and two Node.js versions.
-# The tests also extract archives written by af-backup with external tools (tar, Python tarfile, gzip -t).
+# Build and tests on three OSes and three Node.js versions.
+# The tests also extract archives written by af-backup with external tools (tar, Python tarfile, gzip -t);
+# the compatibility step checks an archive written by af-backup with tar, 7-Zip and Python tarfile.
 name: ci
 
 on:
   push:
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -12,20 +16,24 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        node: [22, 24]
+        node: [22, 24, 26]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - run: npm ci
+      # src and scripts
       - run: npm run typecheck
       - run: npm test
         env:
           AF_BACKUP_TEST_DIR: ${{ runner.temp }}/af-backup-tests
       - name: Crash torture (short)
         run: node scripts/crash-torture.ts "${{ runner.temp }}/af-backup-torture" --iterations=15
+      - name: Archive compatibility (an archive written by af-backup, small set)
+        run: node scripts/tar-gz-compatibility.ts all "${{ runner.temp }}/af-backup-compatibility" --af-backup --big-size=0 --files=500

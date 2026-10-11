@@ -859,13 +859,47 @@ interface KnownLimitation {
   matches(relativePath: string): boolean;
 }
 
-// The built-in Windows tar (bsdtar) converts paths to the ANSI code page and skips entries whose path contains
-// a character outside it (docs/spec.md, "Compression"). Only emoji (outside the BMP) are treated as known:
-// on a code page without Cyrillic the Cyrillic names would be missing too, and that is reported.
-const WINDOWS_TAR_EMOJI: KnownLimitation = {
-  description: 'the built-in Windows tar skips paths with emoji',
-  matches: (relativePath) => /[\u{10000}-\u{10FFFF}]/u.test(relativePath),
-};
+/** The ANSI code page of Windows (1251, 1252...), or null if it cannot be read. */
+function windowsAnsiCodePage(): number | null {
+  const result = spawnSync('reg', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage', '/v', 'ACP'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const match = /ACP\s+REG_SZ\s+(\d+)/.exec(result.stdout ?? '');
+
+  return match ? Number(match[1]) : null;
+}
+
+/** The characters of a single-byte Windows code page (874, 1250-1258), or null for others. */
+function codePageCharacters(codePage: number): Set<string> | null {
+  if (codePage !== 874 && (codePage < 1250 || codePage > 1258)) {
+    return null;
+  }
+
+  const textDecoder = new TextDecoder(`windows-${codePage}`);
+
+  return new Set(textDecoder.decode(Uint8Array.from({ length: 256 }, (_, i) => i)));
+}
+
+/**
+ * The built-in Windows tar (bsdtar) converts paths to the ANSI code page and skips entries whose path contains
+ * a character outside it (docs/spec.md, "Compression"): emoji always, and on a code page without Cyrillic
+ * (1252 on an English Windows, as on CI runners) Cyrillic names too.
+ */
+function windowsTarLimitation(): KnownLimitation {
+  const codePage = windowsAnsiCodePage();
+  const characters = codePage === null ? null : codePageCharacters(codePage);
+  const outsideBmp = /[\u{10000}-\u{10FFFF}]/u;
+
+  if (!characters) {
+    return { description: 'the built-in Windows tar skips paths with emoji', matches: (relativePath) => outsideBmp.test(relativePath) };
+  }
+
+  return {
+    description: `the built-in Windows tar skips paths with characters outside the ANSI code page ${codePage}`,
+    matches: (relativePath) => [...relativePath].some((character) => !characters.has(character)),
+  };
+}
 
 interface FoundEntry {
   type: 'file' | 'dir' | 'other';
@@ -1100,7 +1134,7 @@ function detectTools(): Tool[] {
           extraArguments: [],
           slashPaths: false,
           gnuEnvironment: false,
-          knownLimitation: WINDOWS_TAR_EMOJI,
+          knownLimitation: windowsTarLimitation(),
         },
         { id: 'tar-git', command: 'C:\\Program Files\\Git\\usr\\bin\\tar.exe', extraArguments: ['--force-local'], slashPaths: true, gnuEnvironment: true },
       ]

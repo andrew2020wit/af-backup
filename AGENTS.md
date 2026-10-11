@@ -13,8 +13,9 @@ Instructions for AI agents working with this repository.
 
 ## Current state
 
-Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24. Manual checks still to be done:
-CI has not run yet (the repository is not pushed); 7-Zip in CI; the archive compatibility check from the spec
+Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24, 26. Manual checks still to be done:
+CI has not run yet (the repository is not pushed); whether the CI compatibility step finds 7-Zip on all three OSes
+(it skips tools that are not installed); the archive compatibility check from the spec
 on an archive written by af-backup - `node scripts/tar-gz-compatibility.ts all <work-dir> --af-backup` with the full set
 (8 GiB file, 70,000 entries; so far only a small set on Windows 11, 2026-10-11), plus File Explorer on Windows 11,
 `tar` on Windows 10, Finder and `tar` on macOS, GNU `tar` on Linux; backup to a FAT32/exFAT flash drive (`EFBIG`, case); pulling out the flash drive during copying;
@@ -31,7 +32,7 @@ Node.js >= 22. Development dependencies only: `typescript`, `@types/node` - do n
 ```
 npm install         # once
 npm run build       # tsc → dist/
-npm run typecheck   # tsc --noEmit
+npm run typecheck   # tsc --noEmit for src/ and scripts/ (scripts/tsconfig.json)
 npm test            # build + node:test over dist/**/*.test.js
 ```
 
@@ -47,7 +48,7 @@ npm test            # build + node:test over dist/**/*.test.js
 
 ```
 .github/workflows/
-  ci.yml        # build, typecheck, tests and a short crash torture: Windows, Linux, macOS × Node 22, 24
+  ci.yml        # typecheck, tests, short crash torture and compatibility check: Windows, Linux, macOS × Node 22, 24, 26
 docs/
   spec.md       # behavior specification
   how-it-works.md  # diagrams: modules, the steps of a run, copying, compression, verification

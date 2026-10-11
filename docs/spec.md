@@ -426,8 +426,10 @@ Finder and `tar` on macOS, GNU `tar` on Linux. The check script is `scripts/tar-
 packs it by the rules above (with a simulated rollback), extracts it with the tools it finds and compares;
 File Explorer and Finder - manually, compared by the same script. With `--af-backup` the test data is packed
 by af-backup itself (a backup with one compressed source) and the reference is built from the source files:
-this is how the check before the release is done. Entries with emoji that the built-in Windows `tar` skips
-are reported as its known limitation and do not fail the check.
+this is how the check before the release is done. Entries that the built-in Windows `tar` skips because their path
+has a character outside the ANSI code page of the machine (emoji always; Cyrillic too on an English Windows
+with code page 1252) are reported as its known limitation and do not fail the check. A short run of this check
+is part of CI.
 
 Results (2026-10-03, Windows 11, archive 8.02 GiB, 70,118 files and 123 folders, with one entry rolled back):
 
