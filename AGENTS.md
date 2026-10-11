@@ -13,12 +13,15 @@ Instructions for AI agents working with this repository.
 
 ## Current state
 
-Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24. Pre-release checks still to be done
-(manual): CI has not run yet (the repository is not pushed); 7-Zip in CI; the archive compatibility check from the spec
+Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24. Manual checks still to be done:
+CI has not run yet (the repository is not pushed); 7-Zip in CI; the archive compatibility check from the spec
 on an archive written by af-backup (File Explorer on Windows 11, `tar` on Windows 10, Finder and `tar` on macOS,
-GNU `tar` on Linux); long paths over 260 characters; backup to a FAT32/exFAT flash drive (`EFBIG`, case);
-pulling out the flash drive during copying; a disk root as a source on Linux (`lost+found`) and macOS
-(`.Spotlight-V100`, `.Trashes`, `.fseventsd`) - which service folders cannot be read (see "Sources" in the spec).
+GNU `tar` on Linux); backup to a FAT32/exFAT flash drive (`EFBIG`, case); pulling out the flash drive during copying;
+a disk root as a source on Linux (`lost+found`) and macOS (`.Spotlight-V100`, `.Trashes`, `.fseventsd`) - which
+service folders cannot be read (see "Sources" in the spec); Unicode normalization on macOS - names stored
+decomposed (NFD): masks with letters like "й" and verification on an HFS+ destination (false "missing"/"extra").
+Done: long paths over 260 characters on Windows (2026-10-11, Windows 11, Node 26, an uncompressed source,
+a 560-character path).
 
 ## Build and tests
 
@@ -36,11 +39,14 @@ npm test            # build + node:test over dist/**/*.test.js
 - Temporary folders in tests - only via `makeTemporaryDirectory` (`src/test-support`).
 - File system faults are simulated by replacing methods of `fileSystemOperations`
   (`src/services`, `patchFileSystemOperations`);
-  production code does all file system work through `fileSystemOperations`.
+  production code does all file system work through `fileSystemOperations`. The only exception is
+  `src/utilities/version.ts`: it reads the program's own `package.json` with `node:fs` (not user data, not a fault to simulate).
 
 ## Structure
 
 ```
+.github/workflows/
+  ci.yml        # build, typecheck, tests and a short crash torture: Windows, Linux, macOS × Node 22, 24
 docs/
   spec.md       # behavior specification
   how-it-works.md  # diagrams: modules, the steps of a run, copying, compression, verification
@@ -52,7 +58,7 @@ src/
   cli.ts        # arguments → run
   run-pipeline.ts  # the backup run: steps 0-8 (the only command)
   services/     # task, destination, file list, copying, compression, verification, log, file system, tar.gz...
-  utilities/    # general helpers: error model, arguments, platform, formatting, strict JSON, destination folder layout, version
+  utilities/    # general helpers: error model, arguments, platform, formatting, escaping for the log, strict JSON, destination folder layout, version
   interfaces/   # TypeScript interfaces (*.interface.ts files)
   test-support/ # helpers for tests
 templates/      # static task templates the user copies: windows/ and linux-macos/, each af-backup-task.json
@@ -78,9 +84,9 @@ and put the decision into the specification.
   and commit messages. The only exception is test data whose purpose is non-ASCII content
   (for example, Cyrillic file names in `scripts/tar-gz-compatibility.ts`).
 - Code is TypeScript for Node.js, no browser APIs.
-- The tool works with real user files: it writes only into the destination folder it has created itself
-  and deletes only its own unfinished files there; it never deletes or overwrites anything that existed
-  before the run. Never touch sources.
+- The tool works with real user files: in the destination folder (created by the user, never by the tool) it writes
+  only the backup data folder and the log it has created in this run, and deletes only its own unfinished files
+  inside that backup data folder; it never deletes or overwrites anything that existed before the run. Never touch sources.
 - The tool is cross-platform (Windows, Linux, macOS; development happens on Windows): use `node:path`,
   do not concatenate paths as strings.
 - Behavior changes go into `docs/spec.md` first; if they affect what the readme describes
