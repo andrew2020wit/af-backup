@@ -277,7 +277,7 @@ function isExcluded(relativePath: string, name: string, masks: MaskCounter[], li
   return matched;
 }
 
-/** Per-mask summary: "node_modules: 5, .git: 0". */
+/** Per-mask summary: "node_modules: 5, *.tmp: 0". */
 export function maskSummary(masks: MaskCounter[]): string {
   return masks.map((maskCounter) => `${maskCounter.label}: ${maskCounter.count}`).join(', ');
 }

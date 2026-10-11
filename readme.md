@@ -39,8 +39,8 @@ After updating the repository (`git pull`), run `npm run build` again.
 ## Quick start
 
 1. Create the destination folder, for example `E:\backups\work`, and copy the task template `af-backup-task.json`
-   into it from the [templates](templates) folder of the repository - `templates/windows/af-backup-task.json` (Windows)
-   or `templates/linux-macos/af-backup-task.json` (Linux, macOS).
+   into it from the [templates](templates) folder of the repository - `templates/windows/af-backup-task.json`,
+   `templates/linux/af-backup-task.json` or `templates/macos/af-backup-task.json`.
 
 2. Edit the task - replace the example source paths:
 
@@ -48,8 +48,7 @@ After updating the repository (`git pull`), run `npm run build` again.
    {
      "jsonType": "af-backup-task",
      "version": 1,
-     "description": "Work documents to an external drive",
-     "exclude": ["node_modules", ".git", "Thumbs.db", "*.tmp"],
+     "exclude": ["node_modules", "Thumbs.db", "*.tmp"],
      "sources": [
        { "path": "C:\\work\\docs", "name": "work-docs", "exclude": ["drafts"] },
        { "path": "C:\\Users\\me\\.gitconfig" },

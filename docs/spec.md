@@ -71,7 +71,7 @@ next to the copied data (see "Destination folder"). Each backup has its own log;
 2026-10-04 11:20:16.002 WARN  Skipped link: work-docs/link -> D:\other
 2026-10-04 11:20:16.410 INFO  Backup data folder created: E:\backups\work\backup-data-2026-10-04-11-20-15
 2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: the file is locked (EBUSY), 3 attempts
-2026-10-04 11:25:40.880 INFO  Summary: copied 1520 files / 87 folders / 700 MB; excluded 312 (node_modules: 5, .git: 0, Thumbs.db: 12, *.tmp: 290, work-docs/drafts: 5); warnings 1; errors 1; verification: OK; duration 5 min 25 s
+2026-10-04 11:25:40.880 INFO  Summary: copied 1520 files / 87 folders / 700 MB; excluded 312 (node_modules: 5, Thumbs.db: 12, *.tmp: 290, work-docs/drafts: 5); warnings 1; errors 1; verification: OK; duration 5 min 25 s
 2026-10-04 11:25:40.881 ERROR Backup finished WITH ERRORS: E:\backups\work\backup-data-2026-10-04-11-20-15 is not a valid backup (errors 1), code 1
 ```
 
@@ -162,8 +162,7 @@ are for this task, lying at `E:\backups\work\af-backup-task.json`):
 {
   "jsonType": "af-backup-task",
   "version": 1,
-  "description": "Work documents to an external drive",
-  "exclude": ["node_modules", ".git", "Thumbs.db", "*.tmp"],
+  "exclude": ["node_modules", "Thumbs.db", "*.tmp"],
   "sources": [
     { "path": "C:\\work\\docs", "name": "work-docs", "exclude": ["drafts"] },
     { "path": "C:\\Users\\me\\.gitconfig" },
@@ -178,7 +177,13 @@ The tool does not create task files. The repository has a folder `templates/` wi
 one subfolder per OS; each template is already named `af-backup-task.json`:
 
 - `templates/windows/af-backup-task.json` - Windows paths (the example above);
-- `templates/linux-macos/af-backup-task.json` - the same task with Linux / macOS paths.
+- `templates/linux/af-backup-task.json` - the same task with Linux paths (`/home/me/...`), without the Windows junk
+  mask `Thumbs.db`;
+- `templates/macos/af-backup-task.json` - the same task with macOS paths (`/Users/me/...`), with `.DS_Store`
+  instead of `Thumbs.db`.
+
+The templates do not exclude `.git`: in a folder with projects it holds commits, branches and stashes that may exist
+nowhere else.
 
 The user creates the destination folder, copies the template into it
 (for example, `E:\backups\work\af-backup-task.json`) and replaces the example source paths.
@@ -279,12 +284,12 @@ A source is copied in full, except for exclusions. There are no include filters 
 
 Exclusions are set on two levels:
 
-- the task's `exclude` - applies to all sources (handy for junk: `node_modules`, `.git`, `Thumbs.db`, `*.tmp`);
+- the task's `exclude` - applies to all sources (handy for junk: `node_modules`, `Thumbs.db`, `.DS_Store`, `*.tmp`);
 - the source's `exclude` - only for this source.
 
 ```json
 {
-  "exclude": ["node_modules", ".git", "Thumbs.db", "*.tmp"],
+  "exclude": ["node_modules", "Thumbs.db", "*.tmp"],
   "sources": [
     { "path": "C:\\work\\docs", "name": "work-docs", "exclude": ["drafts", "projects/*/build"] }
   ]

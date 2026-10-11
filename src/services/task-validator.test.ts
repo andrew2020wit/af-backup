@@ -8,8 +8,7 @@ import { validateTask, type ValidationResult } from './task-validator.js';
 const WINDOWS_TASK = {
   jsonType: 'af-backup-task',
   version: 1,
-  description: 'Work documents to an external drive',
-  exclude: ['node_modules', '.git', 'Thumbs.db', '*.tmp'],
+  exclude: ['node_modules', 'Thumbs.db', '*.tmp'],
   sources: [
     { path: 'C:\\work\\docs', name: 'work-docs', exclude: ['drafts'] },
     { path: 'C:\\Users\\me\\.gitconfig' },
@@ -34,7 +33,8 @@ test('the templates in templates/ are valid tasks; the Windows one is the spec e
 
   for (const [file, platform] of [
     ['windows/af-backup-task.json', 'win32'],
-    ['linux-macos/af-backup-task.json', 'posix'],
+    ['linux/af-backup-task.json', 'posix'],
+    ['macos/af-backup-task.json', 'posix'],
   ] as const) {
     const text = await fsPromises.readFile(new URL(file, templates), 'utf8');
     const result = validateTask(parseStrictJson(text), platform);

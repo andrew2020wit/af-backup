@@ -1,8 +1,7 @@
 {
   "jsonType": "af-backup-task",
   "version": 1,
-  "description": "Work documents to an external drive",
-  "exclude": ["node_modules", ".git", "Thumbs.db", "*.tmp"],
+  "exclude": ["node_modules", "Thumbs.db", "*.tmp"],
   "sources": [
     { "path": "C:\\work\\docs", "name": "work-docs", "exclude": ["drafts"] },
     { "path": "C:\\Users\\me\\.gitconfig" },

@@ -61,7 +61,7 @@ src/
   utilities/    # general helpers: error model, arguments, platform, formatting, escaping for the log, strict JSON, destination folder layout, version
   interfaces/   # TypeScript interfaces (*.interface.ts files)
   test-support/ # helpers for tests
-templates/      # static task templates the user copies: windows/ and linux-macos/, each af-backup-task.json
+templates/      # static task templates the user copies: windows/, linux/ and macos/, each af-backup-task.json
 readme.md       # short user-facing description
 test-data.md    # local test data registry, not in git (see "Test data")
 test-data/      # test data, one subfolder per session, not in git

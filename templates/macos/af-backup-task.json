@@ -1,0 +1,10 @@
+{
+  "jsonType": "af-backup-task",
+  "version": 1,
+  "exclude": ["node_modules", ".DS_Store", "*.tmp"],
+  "sources": [
+    { "path": "/Users/me/work/docs", "name": "work-docs", "exclude": ["drafts"] },
+    { "path": "/Users/me/.gitconfig" },
+    { "path": "/Users/me/work/notes", "compress": true }
+  ]
+}
