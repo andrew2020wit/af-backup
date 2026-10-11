@@ -15,8 +15,9 @@ Instructions for AI agents working with this repository.
 
 Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24. Manual checks still to be done:
 CI has not run yet (the repository is not pushed); 7-Zip in CI; the archive compatibility check from the spec
-on an archive written by af-backup (File Explorer on Windows 11, `tar` on Windows 10, Finder and `tar` on macOS,
-GNU `tar` on Linux); backup to a FAT32/exFAT flash drive (`EFBIG`, case); pulling out the flash drive during copying;
+on an archive written by af-backup - `node scripts/tar-gz-compatibility.ts all <work-dir> --af-backup` with the full set
+(8 GiB file, 70,000 entries; so far only a small set on Windows 11, 2026-10-11), plus File Explorer on Windows 11,
+`tar` on Windows 10, Finder and `tar` on macOS, GNU `tar` on Linux; backup to a FAT32/exFAT flash drive (`EFBIG`, case); pulling out the flash drive during copying;
 a disk root as a source on Linux (`lost+found`) and macOS (`.Spotlight-V100`, `.Trashes`, `.fseventsd`) - which
 service folders cannot be read (see "Sources" in the spec); Unicode normalization on macOS - names stored
 decomposed (NFD): masks with letters like "й" and verification on an HFS+ destination (false "missing"/"extra").
@@ -51,7 +52,7 @@ docs/
   spec.md       # behavior specification
   how-it-works.md  # diagrams: modules, the steps of a run, copying, compression, verification
 scripts/
-  tar-gz-compatibility.ts  # .tar.gz compatibility check (format prototype), run: node scripts/tar-gz-compatibility.ts
+  tar-gz-compatibility.ts  # .tar.gz compatibility check (format prototype; all --af-backup checks an archive written by af-backup), run: node scripts/tar-gz-compatibility.ts
   crash-torture.ts  # kill af-backup at random moments and check the invariants (needs npm run build)
 src/
   main.ts       # entry point (bin: dist/main.js)

@@ -2,17 +2,22 @@
 //
 // Prototype of the format from spec: tar POSIX pax (a pax extended header for each entry: path, mtime,
 // size from 8 GiB), each entry is a separate gzip member, the tar end is a separate member.
-// The script creates test data, packs it, checks the archive with its own reader, extracts it
-// with the available tools and compares the result by SHA-256.
+// The script creates test data, packs it (with its own prototype writer or with af-backup itself), checks the archive
+// with its own reader, extracts it with the available tools and compares the result by SHA-256.
 //
 // Runs without a build (Node.js >= 22.18): node scripts/tar-gz-compatibility.ts <command> ...
 //
-//   all <work-dir> [--big-size=8G+1M] [--files=70100] [--keep]
-//       everything at once: generate (if <work-dir>/src does not exist yet) → pack → verify-archive → auto
+//   all <work-dir> [--af-backup] [--big-size=8G+1M] [--files=70100] [--keep]
+//       everything at once: generate (if <work-dir>/src does not exist yet) → pack → verify-archive → auto;
+//       --af-backup - pack with af-backup itself (needs npm run build) in <work-dir>/af-backup-destination
+//       (re-created on each run) and build the reference from the source: the check required before a release
 //   generate <dir> [--big-size=8G+1M] [--files=70100]
 //       test data; --big-size=0 - without the big file
 //   pack <source-dir> <archive.tar.gz>
 //       pack; <archive.tar.gz>.manifest.json is written next to it - the reference for the checks
+//   reference <source-dir> <archive.tar.gz>
+//       write <archive.tar.gz>.manifest.json from the source folder an archive was made of (for an archive
+//       written by af-backup: the source of a compressed source "<name>" is the folder, the archive is <name>.tar.gz)
 //   verify-archive <archive.tar.gz>
 //       check the archive with our own reader (gunzip of all members, tar headers, SHA-256 of entries)
 //   auto <archive.tar.gz> <work-dir> [--keep]
@@ -31,6 +36,7 @@ import { once } from 'node:events';
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as zlib from 'node:zlib';
 
 const BLOCK = 512;
@@ -536,6 +542,66 @@ async function pack(sourceDirectory: string, archive: string): Promise<void> {
   console.log(`Done: ${files} files, ${manifest.entries.length - files} folders, ${manifest.members} gzip members, archive ${formatBytes(position)}`);
 }
 
+/**
+ * The reference for an archive written by someone else (af-backup): built from the source folder the archive
+ * was made of, so verify-archive, auto and check work on that archive too.
+ */
+async function reference(sourceDirectory: string, archive: string): Promise<void> {
+  console.log(`Reference for ${archive} from ${sourceDirectory}`);
+  const entries = await walkSource(sourceDirectory);
+  const manifest: Manifest = { createdAt: new Date().toISOString(), members: entries.length + 1, entries: [] };
+
+  for (const entry of entries) {
+    if (entry.type === 'dir') {
+      manifest.entries.push({ type: 'dir', path: entry.relativePath, mtimeNs: entry.mtimeNs.toString() });
+    } else {
+      const sha256 = await sha256File(entry.absolutePath);
+      manifest.entries.push({ type: 'file', path: entry.relativePath, size: entry.size, sha256, mtimeNs: entry.mtimeNs.toString() });
+    }
+  }
+
+  await fsPromises.writeFile(manifestPath(archive), JSON.stringify(manifest, null, 1));
+  console.log(`Done: ${manifestPath(archive)}`);
+}
+
+/**
+ * Packs the source with af-backup itself (the built dist/main.js): a destination folder with a task of one compressed
+ * source "test" is created in the work folder anew. Returns the path of the archive af-backup has written.
+ */
+async function packWithAfBackup(sourceDirectory: string, workDirectory: string): Promise<string> {
+  const mainJs = fileURLToPath(new URL('../dist/main.js', import.meta.url));
+
+  if (!fs.existsSync(mainJs)) {
+    throw new Error(`af-backup is not built: ${mainJs} - run npm run build`);
+  }
+
+  // the folder belongs to this script: backups of earlier runs are removed (8 GiB each with the full set)
+  const destination = path.join(workDirectory, 'af-backup-destination');
+  await fsPromises.rm(destination, { recursive: true, force: true });
+  await fsPromises.mkdir(destination, { recursive: true });
+
+  await fsPromises.writeFile(
+    path.join(destination, 'af-backup-task.json'),
+    JSON.stringify({ jsonType: 'af-backup-task', version: 1, sources: [{ path: sourceDirectory, name: 'test', compress: true }] }),
+  );
+
+  console.log(`Packing ${sourceDirectory} with af-backup → ${destination}`);
+  const child = spawn(process.execPath, [mainJs, destination], { stdio: 'inherit', windowsHide: true });
+  const [code] = (await once(child, 'close')) as [number | null];
+
+  if (code !== 0) {
+    throw new Error(`af-backup ended with code ${code}`);
+  }
+
+  const dataFolder = (await fsPromises.readdir(destination)).find((name) => name.startsWith('backup-data-'));
+
+  if (!dataFolder) {
+    throw new Error(`af-backup created no backup data folder in ${destination}`);
+  }
+
+  return path.join(destination, dataFolder, 'test.tar.gz');
+}
+
 // ---------- reading tar.gz (our own reader) ----------
 
 class ByteReader {
@@ -783,7 +849,23 @@ function printProblems(problems: string[]): void {
 interface CheckResult {
   ok: boolean;
   summary: string;
+  /** Entries missing because of a known limitation of the tool: they do not make the result an error. */
+  known: number;
 }
+
+/** A documented limitation of a tool: the entries it matches may be missing after extraction. */
+interface KnownLimitation {
+  description: string;
+  matches(relativePath: string): boolean;
+}
+
+// The built-in Windows tar (bsdtar) converts paths to the ANSI code page and skips entries whose path contains
+// a character outside it (docs/spec.md, "Compression"). Only emoji (outside the BMP) are treated as known:
+// on a code page without Cyrillic the Cyrillic names would be missing too, and that is reported.
+const WINDOWS_TAR_EMOJI: KnownLimitation = {
+  description: 'the built-in Windows tar skips paths with emoji',
+  matches: (relativePath) => /[\u{10000}-\u{10FFFF}]/u.test(relativePath),
+};
 
 interface FoundEntry {
   type: 'file' | 'dir' | 'other';
@@ -861,13 +943,14 @@ function mtimeClass(differenceNs: bigint): string {
   return 'not restored';
 }
 
-async function check(archive: string, extracted: string): Promise<CheckResult> {
+async function check(archive: string, extracted: string, knownLimitation?: KnownLimitation): Promise<CheckResult> {
   console.log(`Comparing ${extracted} with the reference ${manifestPath(archive)}`);
   const manifest = await readManifest(archive);
   const extractedEntries = await walkExtracted(await findContentRoot(extracted, manifest));
   const problems: string[] = [];
   const mtimes = new Map<string, number>();
   let missing = 0;
+  let known = 0;
   let wrong = 0;
 
   for (const expectedEntry of manifest.entries) {
@@ -884,6 +967,12 @@ async function check(archive: string, extracted: string): Promise<CheckResult> {
         relativePath = alternative;
         extractedEntry = extractedEntries.get(alternative);
       }
+    }
+
+    if (!extractedEntry && knownLimitation?.matches(expectedEntry.path)) {
+      known++;
+      problems.push(`missing (known limitation): ${expectedEntry.path}`);
+      continue;
     }
 
     if (!extractedEntry) {
@@ -930,14 +1019,15 @@ async function check(archive: string, extracted: string): Promise<CheckResult> {
   printProblems(problems);
   const mtimeText = [...mtimes].map(([className, count]) => `${className} ${count}`).join(', ');
   const ok = missing === 0 && wrong === 0 && extra === 0;
+  const knownText = known ? `; not extracted ${known} - known limitation: ${knownLimitation!.description}` : '';
 
   const summary = ok
-    ? `OK (modification time: ${mtimeText || '-'})`
-    : `ERRORS: missing ${missing}, wrong ${wrong}, extra ${extra} (modification time: ${mtimeText || '-'})`;
+    ? `OK (modification time: ${mtimeText || '-'}${knownText})`
+    : `ERRORS: missing ${missing}, wrong ${wrong}, extra ${extra} (modification time: ${mtimeText || '-'}${knownText})`;
 
   console.log(summary);
 
-  return { ok, summary };
+  return { ok, summary, known };
 }
 
 // ---------- extraction with third-party tools ----------
@@ -978,6 +1068,8 @@ function firstLine(command: string, commandArguments: string[]): string | null {
 interface Tool {
   id: string;
   label: string;
+  /** Entries this tool is known not to extract; it then also exits with code 1. */
+  knownLimitation?: KnownLimitation;
   extract(archive: string, extracted: string): Promise<RunResult>;
 }
 
@@ -993,9 +1085,23 @@ function detectTools(): Tool[] {
   const isWindows = process.platform === 'win32';
 
   // gnuEnvironment: GNU tar from Git calls gzip from its own folder, which is usually not in PATH
-  const tarCandidates: { id: string; command: string; extraArguments: string[]; slashPaths: boolean; gnuEnvironment: boolean }[] = isWindows
+  const tarCandidates: {
+    id: string;
+    command: string;
+    extraArguments: string[];
+    slashPaths: boolean;
+    gnuEnvironment: boolean;
+    knownLimitation?: KnownLimitation;
+  }[] = isWindows
     ? [
-        { id: 'tar-windows', command: 'C:\\Windows\\System32\\tar.exe', extraArguments: [], slashPaths: false, gnuEnvironment: false },
+        {
+          id: 'tar-windows',
+          command: 'C:\\Windows\\System32\\tar.exe',
+          extraArguments: [],
+          slashPaths: false,
+          gnuEnvironment: false,
+          knownLimitation: WINDOWS_TAR_EMOJI,
+        },
         { id: 'tar-git', command: 'C:\\Program Files\\Git\\usr\\bin\\tar.exe', extraArguments: ['--force-local'], slashPaths: true, gnuEnvironment: true },
       ]
     : [{ id: 'tar', command: 'tar', extraArguments: [], slashPaths: false, gnuEnvironment: false }];
@@ -1021,6 +1127,7 @@ function detectTools(): Tool[] {
     tools.push({
       id: candidate.id,
       label: `${candidate.command} (${version})`,
+      ...(candidate.knownLimitation ? { knownLimitation: candidate.knownLimitation } : {}),
       extract: (archive, extracted) => run(candidate.command, [...candidate.extraArguments, '-xzf', toolPath(archive), '-C', toolPath(extracted)], environment),
     });
   }
@@ -1096,8 +1203,9 @@ async function auto(archive: string, workDirectory: string, keep: boolean): Prom
       console.log(`Exit code ${runResult.code}. Output (tail):\n${runResult.output.trim()}`);
     }
 
-    const result = await check(archive, extracted);
-    allOk &&= result.ok && runResult.code === 0;
+    const result = await check(archive, extracted, tool.knownLimitation);
+    // a tool that skipped entries because of its known limitation reports it with code 1
+    allOk &&= result.ok && (runResult.code === 0 || (result.known > 0 && runResult.code === 1));
     rows.push(`| ${tool.label} | ${runResult.code} | ${seconds} s | ${result.summary} |`);
 
     if (!keep) {
@@ -1165,6 +1273,11 @@ async function main(): Promise<number> {
       await pack(path.resolve(positional[0]!), path.resolve(positional[1]!));
 
       return 0;
+    case 'reference':
+      requireArguments(2);
+      await reference(path.resolve(positional[0]!), path.resolve(positional[1]!));
+
+      return 0;
     case 'verify-archive':
       requireArguments(1);
 
@@ -1181,7 +1294,6 @@ async function main(): Promise<number> {
       requireArguments(1);
       const work = path.resolve(positional[0]!);
       const source = path.join(work, 'src');
-      const archive = path.join(work, 'test.tar.gz');
 
       if (await isEmptyOrMissing(source)) {
         await generate(source, bigSize, files);
@@ -1189,16 +1301,25 @@ async function main(): Promise<number> {
         console.log(`Using existing test data: ${source}`);
       }
 
-      await fsPromises.rm(archive, { force: true });
-      await fsPromises.rm(manifestPath(archive), { force: true });
-      await pack(source, archive);
+      let archive: string;
+
+      if (flags.has('af-backup')) {
+        archive = await packWithAfBackup(source, work);
+        await reference(source, archive);
+      } else {
+        archive = path.join(work, 'test.tar.gz');
+        await fsPromises.rm(archive, { force: true });
+        await fsPromises.rm(manifestPath(archive), { force: true });
+        await pack(source, archive);
+      }
+
       const archiveOk = await verifyArchive(archive);
       const toolsOk = await auto(archive, work, keep);
 
       return archiveOk && toolsOk ? 0 : 1;
     }
     default:
-      console.log('Commands: all, generate, pack, verify-archive, auto, check - described at the top of the file.');
+      console.log('Commands: all, generate, pack, reference, verify-archive, auto, check - described at the top of the file.');
 
       return command ? 2 : 0;
   }

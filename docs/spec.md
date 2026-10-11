@@ -424,7 +424,10 @@ Cyrillic names, a name with emoji, a path longer than 260 characters, an empty f
 with the source files by SHA-256. Tools: `tar` on Windows 10 and 11, File Explorer on Windows 11, 7-Zip,
 Finder and `tar` on macOS, GNU `tar` on Linux. The check script is `scripts/tar-gz-compatibility.ts`: it creates test data,
 packs it by the rules above (with a simulated rollback), extracts it with the tools it finds and compares;
-File Explorer and Finder - manually, compared by the same script.
+File Explorer and Finder - manually, compared by the same script. With `--af-backup` the test data is packed
+by af-backup itself (a backup with one compressed source) and the reference is built from the source files:
+this is how the check before the release is done. Entries with emoji that the built-in Windows `tar` skips
+are reported as its known limitation and do not fail the check.
 
 Results (2026-10-03, Windows 11, archive 8.02 GiB, 70,118 files and 123 folders, with one entry rolled back):
 
