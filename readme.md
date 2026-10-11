@@ -3,8 +3,6 @@
 A simple and reliable tool for personal backups. Console, cross-platform (Windows, Linux, macOS),
 written in TypeScript for Node.js.
 
-> Pre-release: manual checks on real disks and archive compatibility checks are still to be done.
-
 ## Key points
 
 - **A backup is a plain folder of files.** Restoring does not need the tool itself:
@@ -34,6 +32,9 @@ npm install -g .
 ```
 
 After that the `af-backup` command is available. af-backup has no runtime dependencies.
+
+`npm install -g .` links the command to the repository folder: do not move or delete the folder.
+After updating the repository (`git pull`), run `npm run build` again.
 
 ## Quick start
 
@@ -65,12 +66,13 @@ After that the `af-backup` command is available. af-backup has no runtime depend
 
    or, from inside the destination folder, just `af-backup`.
 
-The result is the folder `E:\backups\work\backup-data-2026-10-04-11-20-15` with a subfolder per source and nothing else,
-and the log `E:\backups\work\backup-2026-10-04-11-20-15.log` next to it: the names end with the start time of the run
-(`yyyy-mm-dd-HH-MM-SS`, local time). Whether the backup succeeded is shown in the console and recorded in the log (see "Log").
+The result is the folder `E:\backups\work\backup-data-2026-10-04-11-20-15` with a subfolder per source
+(for a compressed source - the archive `<name>.tar.gz`, here `notes.tar.gz`) and nothing else,
+and the log `E:\backups\work\backup-2026-10-04-11-20-15.log` next to it: the names end with the start time
+of the run (`yyyy-mm-dd-HH-MM-SS`, local time). Whether the backup succeeded is shown in the console and recorded in the log (see "Log").
 
 The next run creates a new backup next to this one. Delete old backups (the folder together with its log)
-when they are no longer needed: af-backup never deletes them.
+when they are no longer needed or when space runs short: af-backup never deletes them.
 
 ## Running
 
@@ -93,9 +95,11 @@ af-backup keeps nothing in your home folder.
 | `description` | no | free text for notes |
 | `exclude` | no | exclusion masks for all sources |
 | `sources[].path` | yes | folder or file (absolute path); a folder is copied with all its subfolders at any depth, including empty ones |
-| `sources[].name` | no | subfolder name in the backup (default - the last part of the path) |
+| `sources[].name` | no* | subfolder name in the backup, for a compressed source - the archive name `<name>.tar.gz` (default - the last part of the path) |
 | `sources[].exclude` | no | exclusion masks for this source |
 | `sources[].compress` | no | compress the source into `.tar.gz`, default `false` |
+
+\* Required for the root of a drive or a network share (`D:\`, `/`, `\\server\share`): such a path has no last part.
 
 Masks: `*` - any characters within a name, `**` - any number of folder levels.
 A mask without `/` is a name at any depth (`node_modules`), with `/` - a path from the source root (`projects/*/build`).
@@ -148,7 +152,8 @@ Verification is always part of the backup; there is no separate command to re-ch
 
 - A folder source is copied recursively: the backup repeats its whole tree of subfolders, including empty folders.
   Items matching exclusion masks are left out (a matching folder - with all its content).
-- Links (symlink, junction) are not followed - they are skipped with a warning.
+- Links (symlink, junction) inside a source are not followed - they are skipped with a warning.
+  A source that is itself a link is followed.
 - File permissions, attributes and owner are not preserved - only content and modification time.
 - A file that cannot be read (for example, the database of an always-open program) makes the backup unsuccessful:
   close the program before the backup or add the file to exclusions.
