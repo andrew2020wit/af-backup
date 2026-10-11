@@ -24,7 +24,7 @@ decomposed (NFD): masks with letters like "й" and verification on an HFS+ desti
 Done: long paths over 260 characters on Windows (2026-10-11, Windows 11, Node 26, an uncompressed source,
 a 560-character path); the first CI run (2026-10-11): 7-Zip is found on all three OSes and the compatibility step
 passes; `npm test` failed on Node 22 on Linux and macOS (Node 22 there truncates the modification time to microseconds)
-- fixed in `copier.ts`, to be confirmed by the next CI run.
+- fixed in `copier.ts`; CI passes on all 9 jobs since commit 1c77115.
 
 ## Build and tests
 
