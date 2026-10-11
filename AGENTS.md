@@ -63,7 +63,9 @@ src/
   utilities/    # general helpers: error model, arguments, platform, formatting, escaping for the log, strict JSON, destination folder layout, version
   interfaces/   # TypeScript interfaces (*.interface.ts files)
   test-support/ # helpers for tests
-templates/      # static task templates the user copies: windows/, linux/ and macos/, each af-backup-task.json
+templates/      # what the user copies into a destination folder: windows/, linux/ and macos/, each with
+                #   af-backup-task.json and a launcher script (run-af-backup.cmd / .sh / .command)
+.gitattributes  # line endings of the launcher scripts: CRLF for .cmd, LF for .sh and .command
 readme.md       # short user-facing description; ends with "License and disclaimer"
 LICENSE         # MIT License
 test-data.md    # local test data registry, not in git (see "Test data")

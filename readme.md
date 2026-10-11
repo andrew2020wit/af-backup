@@ -68,6 +68,11 @@ After updating the repository (`git pull`), run `npm run build` again.
 
    or, from inside the destination folder, just `af-backup`.
 
+   To start it by a double click, copy the launcher script from the same templates folder next to the task:
+   `run-af-backup.cmd` (Windows), `run-af-backup.sh` (Linux) or `run-af-backup.command` (macOS; on Linux
+   and macOS make it executable: `chmod +x`). It runs af-backup for its folder in a terminal window and waits
+   for a key before closing the window.
+
 The result is the folder `E:\backups\work\backup-data-2026-10-04-11-20-15` with a subfolder per source
 (for a compressed source - the archive `<name>.tar.gz`, here `notes.tar.gz`) and nothing else,
 and the log `E:\backups\work\backup-2026-10-04-11-20-15.log` next to it: the names end with the start time

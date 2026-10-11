@@ -1,0 +1,4 @@
+# Line endings of the launcher scripts in templates/: cmd.exe expects CRLF, sh expects LF
+*.cmd text eol=crlf
+*.sh text eol=lf
+*.command text eol=lf
