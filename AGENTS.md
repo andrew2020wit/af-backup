@@ -1,0 +1,133 @@
+# AGENTS.md
+
+Instructions for AI agents working with this repository.
+
+## About the project
+
+**AF Backup** is a console tool for simple personal backups, written in TypeScript for Node.js.
+
+- [docs/spec.md](docs/spec.md) - the complete behavior specification. It is the source of truth:
+  if the code and the specification disagree, ask the user which is right instead of silently adjusting one to the other.
+- [readme.md](readme.md) - a short user-facing description, a digest of the specification.
+- [docs/how-it-works.md](docs/how-it-works.md) - diagrams of how a run works, mapped onto the modules.
+
+## Current state
+
+Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24. Pre-release checks still to be done
+(manual): CI has not run yet (the repository is not pushed); 7-Zip in CI; the archive compatibility check from the spec
+on an archive written by af-backup (File Explorer on Windows 11, `tar` on Windows 10, Finder and `tar` on macOS,
+GNU `tar` on Linux); long paths over 260 characters; backup to a FAT32/exFAT flash drive (`EFBIG`, case);
+pulling out the flash drive during copying; a disk root as a source on Linux (`lost+found`) and macOS
+(`.Spotlight-V100`, `.Trashes`, `.fseventsd`) - which service folders cannot be read (see "Sources" in the spec).
+
+## Build and tests
+
+Node.js >= 22. Development dependencies only: `typescript`, `@types/node` - do not pull in extra ones.
+
+```
+npm install         # once
+npm run build       # tsc → dist/
+npm run typecheck   # tsc --noEmit
+npm test            # build + node:test over dist/**/*.test.js
+```
+
+- Tests are `*.test.ts` files next to the code; they run against the built `dist/`.
+- Before running tests, set `AF_BACKUP_TEST_DIR` to the session's registered test data folder (see "Test data").
+- Temporary folders in tests - only via `makeTemporaryDirectory` (`src/test-support`).
+- File system faults are simulated by replacing methods of `fileSystemOperations`
+  (`src/services`, `patchFileSystemOperations`);
+  production code does all file system work through `fileSystemOperations`.
+
+## Structure
+
+```
+docs/
+  spec.md       # behavior specification
+  how-it-works.md  # diagrams: modules, the steps of a run, copying, compression, verification
+scripts/
+  tar-gz-compatibility.ts  # .tar.gz compatibility check (format prototype), run: node scripts/tar-gz-compatibility.ts
+  crash-torture.ts  # kill af-backup at random moments and check the invariants (needs npm run build)
+src/
+  main.ts       # entry point (bin: dist/main.js)
+  cli.ts        # arguments → run
+  run-pipeline.ts  # the backup run: steps 0-8 (the only command)
+  services/     # task, destination, file list, copying, compression, verification, log, file system, tar.gz...
+  utilities/    # general helpers: error model, arguments, platform, formatting, strict JSON, destination folder layout, version
+  interfaces/   # TypeScript interfaces (*.interface.ts files)
+  test-support/ # helpers for tests
+templates/      # static task templates the user copies: windows/ and linux-macos/, each af-backup-task.json
+readme.md       # short user-facing description
+test-data.md    # local test data registry, not in git (see "Test data")
+test-data/      # test data, one subfolder per session, not in git
+```
+
+Where a file goes in `src/`: the entry point and the top-level modules (`main.ts`, `cli.ts`, `run-pipeline.ts`)
+live in the root of `src/`; helpers live in `src/<kind>/`, by kind of file (`services/`, `utilities/`, `interfaces/`,
+`test-support/`).
+
+## Key concepts
+
+Not duplicated here so they do not go stale: task, destination, backup folder statuses, verification
+and guarantees are described in [docs/spec.md](docs/spec.md).
+If something is missing or ambiguous in the specification, do not make it up: discuss it with the user first
+and put the decision into the specification.
+
+## Working rules
+
+- **Everything is in English:** code, identifiers, comments, user-facing messages, documentation
+  and commit messages. The only exception is test data whose purpose is non-ASCII content
+  (for example, Cyrillic file names in `scripts/tar-gz-compatibility.ts`).
+- Code is TypeScript for Node.js, no browser APIs.
+- The tool works with real user files: it writes only into the destination folder it has created itself
+  and deletes only its own unfinished files there; it never deletes or overwrites anything that existed
+  before the run. Never touch sources.
+- The tool is cross-platform (Windows, Linux, macOS; development happens on Windows): use `node:path`,
+  do not concatenate paths as strings.
+- Behavior changes go into `docs/spec.md` first; if they affect what the readme describes
+  (commands, task fields, statuses, exit codes), update the readme too.
+- When the task format changes, update together: the `Task` interface, the templates in `templates/`, `docs/spec.md` and the readme.
+  The `version` field versions the format (`jsonType` only marks the file as a task) - bump `version`
+  on incompatible changes.
+- Committing is at your discretion (logically complete changes, meaningful messages).
+  Push only when the user asks.
+
+## Test data
+
+Test data (files and folders created for tests, checks, experiments) must never be left behind unnoticed,
+even after a power loss or a crash. For that there is a local registry `test-data.md` in the repository root
+(ignored by git; if it is missing, create it from the template below).
+
+- **Before** creating test files or folders, add their paths to `test-data.md`. An entry that is written
+  but whose data was never created is harmless; data without an entry is lost track of.
+- As a rule, each session puts all its test data into one folder of its own and registers only that folder:
+  `test-data/<YYYY-MM-DD_HHmmss>-<short-purpose>/` in the repository root (`test-data/` is ignored by git).
+  Never register or delete `test-data/` as a whole: another session may be using it at the same time.
+  A scratchpad or temporary folder is fine too, as long as it is registered.
+- This also covers data created by tools: for automated tests, set `AF_BACKUP_TEST_DIR` to the session's
+  registered folder (tests create their temporary folders there, see `src/test-support`); give
+  `scripts/tar-gz-compatibility.ts` and `scripts/crash-torture.ts` a working folder inside it.
+- The `(no entries)` line stays only while the list is empty: remove it when adding the first entry
+  and put it back after removing the last one.
+- After the test data is deleted, remove its entry.
+- At the start of work, check `test-data.md`. Entries in it are usually leftovers of an interrupted session,
+  but they may also belong to another session running right now. Show the entries to the user and ask
+  whether any other session is still using them; delete the data and remove the entries only after the user
+  confirms. Delete only what is listed there, and look at the path before deleting (it must be test data,
+  never a source or a user folder).
+
+Template for `test-data.md`:
+
+```markdown
+# Test data registry
+
+Local file, not tracked by git. Lists test files and folders that were created on this machine
+and have not been deleted yet, so that leftovers can be removed after a power loss or a crash.
+The rules are in [AGENTS.md](AGENTS.md), section "Test data".
+
+## Entries
+
+An entry is added **before** the data is created and removed after the data is deleted.
+Format: `- <absolute path> | <created, YYYY-MM-DD HH:mm> | <what created it and why>`
+
+(no entries)
+```

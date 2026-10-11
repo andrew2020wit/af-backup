@@ -1,0 +1,10 @@
+# Local test data registry and the test data folder (see AGENTS.md, "Test data")
+/test-data.md
+/test-data/
+
+# Build output and dependencies
+/node_modules/
+/dist/
+
+# IDE settings
+/.idea/
