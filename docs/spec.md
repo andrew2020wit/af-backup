@@ -67,7 +67,7 @@ All service information about a backup is kept **only in its log** **`<destinati
 next to the copied data (see "Destination folder"). Each backup has its own log; it is a plain text file:
 
 ```
-2026-10-04 11:20:15.123 INFO  Backup started: destination folder E:\backups\work; machine DESKTOP-ANDREW, af-backup 1.0.0, Node 22.x, Windows 11, time zone +03:00
+2026-10-04 11:20:15.123 INFO  Backup started: destination folder E:\backups\work; machine DESKTOP-ANDREW, af-backup 1.0.0, Node 22.x, Windows 10.0.26300, time zone +03:00
 2026-10-04 11:20:16.002 WARN  Skipped link: work-docs/link -> D:\other
 2026-10-04 11:20:16.410 INFO  Backup data folder created: E:\backups\work\backup-data-2026-10-04-11-20-15
 2026-10-04 11:20:18.517 ERROR work-docs/mail.pst: the file is locked (EBUSY), 3 attempts
@@ -78,7 +78,9 @@ next to the copied data (see "Destination folder"). Each backup has its own log;
 What is written:
 
 - the start of the run - the destination folder, machine, program, Node.js, OS and time zone; it is the first line,
-  produced at the very start of the run, before any check;
+  produced right after the arguments have been checked, before any other check (with invalid arguments there is
+  no such line, only the "could not start" line). The OS is shown by its name and the version Node.js reports:
+  on Windows this is the kernel version, Windows 11 shows as 10.0.22000 and above;
 - the creation of the backup data folder;
 - warnings and errors as they happen (see "Error handling");
 - the summary - what was copied, how many items each exclusion mask matched, warnings, errors, verification, duration;
@@ -332,7 +334,9 @@ names and give unexpected matches.
   and would exclude the whole content of the source or entire levels.
 
 **Transparency.** The summary in the log shows how many items matched each mask (an excluded folder counts
-as one item, its content is not counted): a typo like `node_module` is visible by zero matches.
+as one item, its content is not counted): a typo like `node_module` is visible by zero matches. An item matching
+several masks is counted by each of them, so a zero always means that the mask matched nothing; the total
+`excluded N` counts items, not matches.
 Excluded items are not listed one by one. This is information, not a warning.
 
 ### Compression
@@ -675,7 +679,9 @@ A path in a backup is longer than in the source (the backup data folder path and
   the archive exceeded the limit: the entry is rolled back, archiving of the source stops (see "Compression").
 - A name in the source that cannot be represented in Unicode (on Linux - non-UTF-8 bytes; Node.js mangles such
   names and cannot open the file) - level 3 error "file name is not in UTF-8 encoding" with the escaped name,
-  no retries. For a folder with such a name, all its content is skipped (one error).
+  no retries. For a folder with such a name, all its content is skipped (one error). Exclusions are checked first
+  here too: masks are matched against the name with the invalid bytes replaced by U+FFFD, and a matching item
+  is excluded without an error.
 - Each file is created **in "new only" mode**: if the file already exists, this is a level 3 error.
   The backup data folder is always new, so an existing file means a name collision - for example,
   `Readme` and `readme` from Linux on a case-insensitive disk. This catches overwrites with any combination of OSes.

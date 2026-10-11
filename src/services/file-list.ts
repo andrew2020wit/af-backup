@@ -49,7 +49,10 @@ export interface FileList {
   totalBytes: number;
 }
 
-const textDecoder = new TextDecoder('utf-8', { fatal: true });
+// ignoreBOM: a name may start with U+FEFF, it must not be dropped
+const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+/** For matching masks against a name that is not in UTF-8: invalid bytes become U+FFFD. */
+const lossyTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true });
 
 function specialKind(stats: { isFIFO(): boolean; isSocket(): boolean; isBlockDevice(): boolean; isCharacterDevice(): boolean }): string {
   if (stats.isFIFO()) {
@@ -178,6 +181,13 @@ async function walk(
     try {
       name = textDecoder.decode(raw);
     } catch {
+      // exclusions come first: an excluded item is not an error even if its name is not in UTF-8
+      const lossyName = lossyTextDecoder.decode(raw);
+
+      if (isExcluded(relativeDirectory ? `${relativeDirectory}/${lossyName}` : lossyName, lossyName, masks, list)) {
+        continue;
+      }
+
       const relativePath = relativeDirectory ? `${escapeControl(relativeDirectory)}/${escapeBytes(raw)}` : escapeBytes(raw);
       report.error(`${escapeControl(list.source.name)}/${relativePath}: file name is not in UTF-8 encoding - skipped${directoryEntry.isDirectory() ? ' with all its content' : ''}`);
       continue;
@@ -193,11 +203,7 @@ async function walk(
     const relativePath = relativeDirectory ? `${relativeDirectory}/${child.name}` : child.name;
     const absolutePath = path.join(absoluteDirectory, child.name);
 
-    const matched = masks.find((maskCounter) => maskCounter.mask.matches(relativePath, child.name));
-
-    if (matched) {
-      matched.count++;
-      list.excluded++;
+    if (isExcluded(relativePath, child.name, masks, list)) {
       continue;
     }
 
@@ -248,6 +254,27 @@ async function walk(
 
     report.warn(`Skipped special file (${specialKind(stats)}): ${shown(relativePath)}`);
   }
+}
+
+/**
+ * Whether an item is excluded. It is counted by every mask that matches it, so a zero always means "matched nothing";
+ * `excluded` of the source counts items, not matches (docs/spec.md, "Exclusions" → "Transparency").
+ */
+function isExcluded(relativePath: string, name: string, masks: MaskCounter[], list: SourceList): boolean {
+  let matched = false;
+
+  for (const maskCounter of masks) {
+    if (maskCounter.mask.matches(relativePath, name)) {
+      maskCounter.count++;
+      matched = true;
+    }
+  }
+
+  if (matched) {
+    list.excluded++;
+  }
+
+  return matched;
 }
 
 /** Per-mask summary: "node_modules: 5, .git: 0". */

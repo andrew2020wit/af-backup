@@ -25,7 +25,7 @@ export function escapeControl(text: string): string {
 
 /** A name from raw bytes: valid UTF-8 sequences as text, invalid bytes as \xNN. */
 export function escapeBytes(bytes: Buffer): string {
-  const textDecoder = new TextDecoder('utf-8', { fatal: true });
+  const textDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
   let escaped = '';
   let i = 0;
 

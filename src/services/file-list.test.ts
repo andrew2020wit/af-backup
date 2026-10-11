@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import type { Dirent } from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { after, before, test } from 'node:test';
@@ -6,6 +7,7 @@ import { makeTemporaryDirectory, writeTree } from '../test-support/test-director
 import { validateTask, type ValidatedTask } from './task-validator.js';
 import { parseStrictJson } from '../utilities/strict-json.js';
 import { buildFileList } from './file-list.js';
+import { fileSystemOperations, patchFileSystemOperations, resetFileSystemOperations } from './file-system-operations.js';
 import { RunReport, type ReportEvent } from './run-report.js';
 
 let directory: string;
@@ -131,4 +133,59 @@ test('links inside a source are skipped with a warning; the source itself may be
   assert.deepEqual(list.sources[0]!.entries.map((entry) => entry.relativePath), ['real', 'real/f.txt']);
   assert.equal(report.warnings, 1);
   assert.match(events.find((event) => event.level === 'WARN')!.text, /^Skipped link: links\/jn -> /);
+});
+
+test('an item matching several masks is counted by each of them, but excluded once', async () => {
+  const source = path.join(directory, 'several');
+  await writeTree(source, { 'cache/a.tmp': 'a', 'keep.txt': 'k' });
+  const task = makeTask({ exclude: ['*.tmp'], sources: [{ path: source, name: 'docs', exclude: ['cache/*.tmp'] }] });
+  const list = await buildFileList(task, collect().report, undefined, false);
+
+  assert.deepEqual(
+    list.masks.map((maskCounter) => [maskCounter.label, maskCounter.count]),
+    [
+      ['*.tmp', 1],
+      ['docs/cache/*.tmp', 1],
+    ],
+  );
+  assert.equal(list.sources[0]!.excluded, 1);
+});
+
+test('a name not in UTF-8: exclusions first, otherwise a level 3 error', async () => {
+  const source = path.join(directory, 'not-utf8');
+  await writeTree(source, { 'a.txt': 'a' });
+  const realReaddirBuffer = fileSystemOperations.readdirBuffer;
+  // such names cannot be created on Windows and macOS: the folder listing is simulated
+  const fakeEntry = (bytes: number[]) => ({ name: Buffer.from(bytes), isDirectory: () => false }) as unknown as Dirent<Buffer>;
+
+  patchFileSystemOperations({
+    readdirBuffer: async (directoryPath) => [
+      ...(await realReaddirBuffer(directoryPath)),
+      // "b\xff.tmp" and "c\xff.txt"
+      fakeEntry([0x62, 0xff, 0x2e, 0x74, 0x6d, 0x70]),
+      fakeEntry([0x63, 0xff, 0x2e, 0x74, 0x78, 0x74]),
+    ],
+  });
+
+  try {
+    const task = makeTask({ exclude: ['*.tmp'], sources: [{ path: source, name: 'docs' }] });
+    const { report, events } = collect();
+    const list = await buildFileList(task, report, undefined, false);
+    assert.deepEqual(list.sources[0]!.entries.map((entry) => entry.relativePath), ['a.txt']);
+    assert.deepEqual(list.masks.map((maskCounter) => [maskCounter.label, maskCounter.count]), [['*.tmp', 1]]);
+    assert.equal(report.errors, 1);
+    assert.equal(events[0]!.text, 'docs/c\\xff.txt: file name is not in UTF-8 encoding - skipped');
+  } finally {
+    resetFileSystemOperations();
+  }
+});
+
+test('a name starting with U+FEFF keeps it', async () => {
+  const source = path.join(directory, 'bom');
+  await writeTree(source, { '﻿bom.txt': 'b' });
+  const task = makeTask({ sources: [{ path: source }] });
+  const { report } = collect();
+  const list = await buildFileList(task, report);
+  assert.deepEqual(list.sources[0]!.entries.map((entry) => entry.relativePath), ['﻿bom.txt']);
+  assert.equal(report.errors, 0);
 });
