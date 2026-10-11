@@ -27,7 +27,7 @@ How af-backup is designed - these are design goals, not guarantees:
 Requires [Node.js](https://nodejs.org/) 22 or newer. af-backup is installed from the repository:
 
 ```
-git clone <repository URL> af-backup
+git clone https://github.com/andrew2020wit/af-backup.git
 cd af-backup
 npm install
 npm run build

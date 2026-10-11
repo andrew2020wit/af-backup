@@ -14,7 +14,9 @@ Instructions for AI agents working with this repository.
 ## Current state
 
 Implemented and covered by tests; CI is set up for Windows, Linux and macOS × Node 22, 24, 26. Manual checks still to be done:
-CI has not run yet (the repository is not pushed); whether the CI compatibility step finds 7-Zip on all three OSes
+the first CI run (2026-10-11, commit eb688e1, https://github.com/andrew2020wit/af-backup/actions/runs/38114112306)
+failed `npm test` on Node 22 on Ubuntu and macOS (the cause is not known yet: the logs need a GitHub sign-in);
+the other 7 jobs passed, including the compatibility step; whether the CI compatibility step finds 7-Zip on all three OSes
 (it skips tools that are not installed); the archive compatibility check from the spec
 on an archive written by af-backup - `node scripts/tar-gz-compatibility.ts all <work-dir> --af-backup` with the full set
 (8 GiB file, 70,000 entries; so far only a small set on Windows 11, 2026-10-11), plus File Explorer on Windows 11,
