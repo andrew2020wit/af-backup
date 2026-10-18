@@ -8,6 +8,10 @@ cd /d "%~dp0"
 call af-backup
 set "AF_BACKUP_EXIT_CODE=%ERRORLEVEL%"
 echo.
-echo af-backup finished with exit code %AF_BACKUP_EXIT_CODE% (0 - success; see the lines above).
+if "%AF_BACKUP_EXIT_CODE%"=="0" (
+  echo Backup completed successfully.
+) else (
+  echo af-backup finished with exit code %AF_BACKUP_EXIT_CODE% ^(0 - success; see the lines above^).
+)
 pause
 exit /b %AF_BACKUP_EXIT_CODE%

@@ -50,6 +50,10 @@ exit_code=$?
 trap - INT
 
 echo
-echo "af-backup finished with exit code $exit_code (0 - success; see the lines above)."
+if [ "$exit_code" -eq 0 ]; then
+  echo 'Backup completed successfully.'
+else
+  echo "af-backup finished with exit code $exit_code (0 - success; see the lines above)."
+fi
 wait_for_key
 exit "$exit_code"

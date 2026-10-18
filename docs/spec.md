@@ -242,8 +242,8 @@ The templates are valid tasks: they pass validation as they are.
 **Launcher scripts.** Next to each template lies a script that starts af-backup by a double click:
 `run-af-backup.cmd` (Windows), `run-af-backup.sh` (Linux), `run-af-backup.command` (macOS: Finder opens it
 in Terminal). Copied into the destination folder next to the task file, the script runs `af-backup` for the folder
-it lies in (without an argument, from that folder) in its own terminal window, prints the exit code and waits
-for a key before the window closes, so that the result stays readable. On Linux, started without a terminal
+it lies in (without an argument, from that folder) in its own terminal window, prints the result - "Backup completed
+successfully." for exit code 0, otherwise the exit code - and waits for a key before the window closes, so that the result stays readable. On Linux, started without a terminal
 (from a file manager), the script opens one (`x-terminal-emulator`, `gnome-terminal`, `konsole`, `xfce4-terminal`,
 `xterm`). If `af-backup` is not found in `PATH`, the script says so and waits for a key too. The scripts on Linux
 and macOS must be executable (`chmod +x`). Next to each of them lies the same script for `--compute-size`:
